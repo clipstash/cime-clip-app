@@ -1,0 +1,235 @@
+.stars {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.stars span {
+  position: absolute;
+  color: #ffffff44;
+  font-size: 1.2rem;
+}
+.star-1 { top: 10%; left: 8%; }
+.star-2 { top: 20%; left: 45%; }
+.star-3 { top: 15%; right: 10%; }
+.star-4 { top: 40%; left: 5%; }
+.star-5 { top: 55%; right: 8%; }
+
+nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.2rem 3rem;
+  border-bottom: 1px solid #222;
+  background: rgba(10, 10, 10, 0.9);
+  backdrop-filter: blur(10px);
+}
+nav a {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #fff;
+  text-decoration: none;
+  letter-spacing: -0.5px;
+}
+.nav-right {
+  display: flex;
+  gap: 2rem;
+  color: #888;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.hero {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 6rem 2rem 4rem;
+}
+.label {
+  font-size: 0.85rem;
+  color: #888;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+h1 {
+  font-size: clamp(3rem, 8vw, 6rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -2px;
+  margin-bottom: 1.5rem;
+}
+.desc {
+  color: #888;
+  font-size: 1rem;
+  line-height: 1.7;
+  margin-bottom: 3rem;
+}
+
+.form-card {
+  max-width: 640px;
+  margin: 0 auto;
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.form-row input[type="text"] {
+  width: 100%;
+  background: #0a0a0a;
+  border: 1px solid #333;
+  border-radius: 0.5rem;
+  padding: 0.8rem 1rem;
+  color: #fff;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border 0.2s;
+  box-sizing: border-box;
+}
+.form-row input[type="text"]:focus {
+  border-color: #555;
+}
+.time-row {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-end;
+}
+.time-input {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1;
+}
+.time-input label {
+  font-size: 0.75rem;
+  color: #666;
+}
+.time-input input {
+  background: #0a0a0a;
+  border: 1px solid #333;
+  border-radius: 0.5rem;
+  padding: 0.7rem 0.8rem;
+  color: #fff;
+  font-size: 0.9rem;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+button {
+  background: #fff;
+  color: #000;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.2s;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.error {
+  color: #f87171;
+  font-size: 0.85rem;
+}
+
+.clips-section {
+  position: relative;
+  z-index: 1;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 2rem 6rem;
+}
+h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  letter-spacing: -0.5px;
+}
+.empty {
+  color: #555;
+  text-align: center;
+  padding: 3rem;
+  border: 1px dashed #222;
+  border-radius: 1rem;
+}
+.clips-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+.clip-card {
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 0.75rem;
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: border-color 0.2s;
+}
+.clip-card:hover {
+  border-color: #444;
+}
+.clip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.platform {
+  font-size: 0.7rem;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.status {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.clip-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #eee;
+}
+.clip-sub {
+  font-size: 0.8rem;
+  color: #666;
+}
+.clip-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #555;
+}
+.download-btn {
+  display: inline-block;
+  margin-top: 0.5rem;
+  background: transparent;
+  border: 1px solid #444;
+  border-radius: 0.4rem;
+  padding: 0.4rem 1rem;
+  color: #fff;
+  font-size: 0.8rem;
+  text-decoration: none;
+  text-align: center;
+  transition: background 0.2s;
+}
+.download-btn:hover {
+  background: #222;
+}
+.clip-error {
+  font-size: 0.75rem;
+  color: #f87171;
+  line-height: 1.4;
+  word-break: break-all;
+}
