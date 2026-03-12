@@ -27,9 +27,7 @@ vite.config.ts.timestamp-*
 /playwright-report
 
 # IDE
-.vscode/*
-!.vscode/settings.json
-!.vscode/extensions.json
+.vscode/
 .idea/
 
 # OS
