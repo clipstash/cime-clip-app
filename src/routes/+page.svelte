@@ -91,12 +91,12 @@
     </div>
     <div class="form-row time-row">
       <div class="time-input">
-        <label>시작 (초)</label>
-        <input type="number" bind:value={startTime} min="0" />
+        <label for="start-time">시작 (초)</label>
+        <input id="start-time" type="number" bind:value={startTime} min="0" />
       </div>
       <div class="time-input">
-        <label>종료 (초)</label>
-        <input type="number" bind:value={endTime} min="1" />
+        <label for="end-time">종료 (초)</label>
+        <input id="end-time" type="number" bind:value={endTime} min="1" />
       </div>
       <button onclick={submitClip} disabled={loading}>
         {loading ? '처리중...' : '클립 생성 ✦'}
