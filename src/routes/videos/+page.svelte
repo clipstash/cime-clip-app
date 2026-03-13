@@ -2,6 +2,9 @@
   import { onMount } from 'svelte';
   import '../../styles/page.css';
   import { getVideos, createVideo, deleteVideo, type Video } from '$lib/api/videos';
+  import { statusColor, statusLabel } from '$lib/utils/status';
+  import Background from '$lib/components/Background.svelte';
+  import Nav from '$lib/components/Nav.svelte';
 
   let url = $state('');
   let totalTime = $state('');
@@ -29,20 +32,6 @@
     }
   }
 
-  function statusColor(status?: string) {
-    if (status === 'completed') return '#4ade80';
-    if (status === 'failed') return '#f87171';
-    if (status === 'processing') return '#facc15';
-    return '#888888';
-  }
-
-  function statusLabel(status?: string) {
-    if (status === 'completed') return '✅ 완료';
-    if (status === 'failed') return '❌ 실패';
-    if (status === 'processing') return '⏳ 처리중';
-    return '🕐 대기중';
-  }
-
   async function removeVideo(id: string) {
     try {
       await deleteVideo(id);
@@ -59,32 +48,8 @@
   });
 </script>
 
-<div class="bg-gradient"></div>
-<div class="stars">
-  <span class="star-1">✦</span>
-  <span class="star-2">✦</span>
-  <span class="star-3">✦</span>
-  <span class="star-4">✦</span>
-  <span class="star-5">✦</span>
-  <span class="star-6">✦</span>
-  <span class="star-7">✦</span>
-  <span class="star-8">✦</span>
-  <span class="star-9">✦</span>
-  <span class="star-10">✦</span>
-  <span class="star-11">✦</span>
-  <span class="star-12">✦</span>
-</div>
-
-<nav>
-  <div class="nav-left">
-    <a href="/">ClipDown</a>
-  </div>
-  <div class="nav-right">
-    <a href="/clips">Clips</a>
-    <a href="/record">Record</a>
-    <a href="/videos" class="nav-active">Videos</a>
-  </div>
-</nav>
+<Background />
+<Nav active="videos" />
 
 <section class="hero">
   <p class="label">cime video downloader</p>
@@ -144,11 +109,11 @@
               <span>총 시간: {video.total_time}</span>
             {/if}
             {#if video.file_size}
-              <span>{(video.file_size / 1024 / 1024).toFixed(1)} MB</span>
+              <span>{(Number(video.file_size) / 1024 / 1024).toFixed(1)} MB</span>
             {/if}
           </div>
-          {#if video.s3_url && video.status === 'completed'}
-            <a class="download-btn" href={video.s3_url} download>다운로드</a>
+          {#if video.file_url && video.status === 'completed'}
+            <a class="download-btn" href={video.file_url} download>다운로드</a>
           {/if}
           {#if video.error_message}
             <p class="clip-error">{video.error_message}</p>

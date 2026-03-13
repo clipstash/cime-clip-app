@@ -10,7 +10,7 @@ export async function startRecord(url: string, file_name: string): Promise<void>
   const res = await fetch(`${API_URL}/record/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url, file_name })
+    body: JSON.stringify({ url, filename: file_name })
   });
   if (!res.ok) throw new Error('녹화 시작 실패');
 }
@@ -26,5 +26,6 @@ export async function getActiveRecords(): Promise<ActiveRecord[]> {
   const res = await fetch(`${API_URL}/record/active`);
   if (!res.ok) return [];
   const data = await res.json();
-  return Array.isArray(data) ? data : [];
+  const list: string[] = Array.isArray(data?.active_list) ? data.active_list : [];
+  return list.map((filename) => ({ filename }));
 }

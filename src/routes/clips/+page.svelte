@@ -2,6 +2,9 @@
   import { onMount } from 'svelte';
   import '../../styles/page.css';
   import { getClips, createClip, deleteClip, type Clip } from '$lib/api/clips';
+  import { statusColor, statusLabel } from '$lib/utils/status';
+  import Background from '$lib/components/Background.svelte';
+  import Nav from '$lib/components/Nav.svelte';
 
   let url = $state('');
   let startH = $state(0);
@@ -55,20 +58,6 @@
     }
   }
 
-  function statusColor(status: string) {
-    if (status === 'completed') return '#4ade80';
-    if (status === 'failed') return '#f87171';
-    if (status === 'processing') return '#facc15';
-    return '#888888';
-  }
-
-  function statusLabel(status: string) {
-    if (status === 'completed') return '✅ 완료';
-    if (status === 'failed') return '❌ 실패';
-    if (status === 'processing') return '⏳ 처리중';
-    return '🕐 대기중';
-  }
-
   async function removeClip(id: string) {
     try {
       await deleteClip(id);
@@ -85,32 +74,8 @@
   });
 </script>
 
-<div class="bg-gradient"></div>
-<div class="stars">
-  <span class="star-1">✦</span>
-  <span class="star-2">✦</span>
-  <span class="star-3">✦</span>
-  <span class="star-4">✦</span>
-  <span class="star-5">✦</span>
-  <span class="star-6">✦</span>
-  <span class="star-7">✦</span>
-  <span class="star-8">✦</span>
-  <span class="star-9">✦</span>
-  <span class="star-10">✦</span>
-  <span class="star-11">✦</span>
-  <span class="star-12">✦</span>
-</div>
-
-<nav>
-  <div class="nav-left">
-    <a href="/">ClipDown</a>
-  </div>
-  <div class="nav-right">
-    <a href="/clips" class="nav-active">Clips</a>
-    <a href="/record">Record</a>
-    <a href="/videos">Videos</a>
-  </div>
-</nav>
+<Background />
+<Nav active="clips" />
 
 <section class="hero">
   <p class="label">cime clip downloader</p>
@@ -195,8 +160,8 @@
               <span>{(clip.file_size / 1024 / 1024).toFixed(1)} MB</span>
             {/if}
           </div>
-          {#if clip.s3_url && clip.status === 'completed'}
-            <a class="download-btn" href={clip.s3_url} download>다운로드</a>
+          {#if clip.file_url && clip.status === 'completed'}
+            <a class="download-btn" href={clip.file_url} download>다운로드</a>
           {/if}
           {#if clip.error_message}
             <p class="clip-error">{clip.error_message}</p>

@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import '../../styles/page.css';
-  import './record.css';
+  import '../../styles/record.css';
   import { startRecord, stopRecord, getActiveRecords, type ActiveRecord } from '$lib/api/record';
+  import Background from '$lib/components/Background.svelte';
+  import Nav from '$lib/components/Nav.svelte';
 
   let url = $state('');
   let fileName = $state('');
@@ -23,8 +25,8 @@
       url = '';
       fileName = '';
       await fetchActive();
-    } catch (e: any) {
-      errorMsg = e.message;
+    } catch (e) {
+      errorMsg = e instanceof Error ? e.message : String(e);
     } finally {
       loading = false;
     }
@@ -34,8 +36,8 @@
     try {
       await stopRecord(filename);
       activeRecords = activeRecords.filter((r) => r.filename !== filename);
-    } catch (e: any) {
-      errorMsg = e.message;
+    } catch (e) {
+      errorMsg = e instanceof Error ? e.message : String(e);
     }
   }
 
@@ -46,32 +48,8 @@
   });
 </script>
 
-<div class="bg-gradient"></div>
-<div class="stars">
-  <span class="star-1">✦</span>
-  <span class="star-2">✦</span>
-  <span class="star-3">✦</span>
-  <span class="star-4">✦</span>
-  <span class="star-5">✦</span>
-  <span class="star-6">✦</span>
-  <span class="star-7">✦</span>
-  <span class="star-8">✦</span>
-  <span class="star-9">✦</span>
-  <span class="star-10">✦</span>
-  <span class="star-11">✦</span>
-  <span class="star-12">✦</span>
-</div>
-
-<nav>
-  <div class="nav-left">
-    <a href="/">ClipDown</a>
-  </div>
-  <div class="nav-right">
-    <a href="/clips">Clips</a>
-    <a href="/record" class="nav-active">Record</a>
-    <a href="/videos">Videos</a>
-  </div>
-</nav>
+<Background />
+<Nav active="recording" />
 
 <section class="hero">
   <p class="label">cime live recorder</p>
@@ -112,7 +90,7 @@
     <p class="empty">현재 녹화 중인 스트림이 없어요.</p>
   {:else}
     <div class="clips-grid">
-      {#each activeRecords as record}
+      {#each activeRecords as record (record.filename)}
         <div class="clip-card record-card">
           <div class="clip-header">
             <div class="clip-header-left">

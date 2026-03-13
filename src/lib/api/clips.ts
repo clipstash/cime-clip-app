@@ -9,7 +9,7 @@ export type Clip = {
   start_time: number;
   end_time: number;
   file_size?: number;
-  s3_url?: string;
+  file_url?: string;
   error_message?: string;
 };
 

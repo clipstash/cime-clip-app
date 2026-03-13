@@ -2,34 +2,12 @@
   import { resolve } from '$app/paths';
   import '../styles/page.css';
   import '../styles/landing.css';
+  import Background from '$lib/components/Background.svelte';
+  import Nav from '$lib/components/Nav.svelte';
 </script>
 
-<div class="bg-gradient"></div>
-<div class="stars">
-  <span class="star-1">✦</span>
-  <span class="star-2">✦</span>
-  <span class="star-3">✦</span>
-  <span class="star-4">✦</span>
-  <span class="star-5">✦</span>
-  <span class="star-6">✦</span>
-  <span class="star-7">✦</span>
-  <span class="star-8">✦</span>
-  <span class="star-9">✦</span>
-  <span class="star-10">✦</span>
-  <span class="star-11">✦</span>
-  <span class="star-12">✦</span>
-</div>
-
-<nav>
-  <div class="nav-left">
-    <a href={resolve('/')}>ClipDown</a>
-  </div>
-  <div class="nav-right">
-    <a href={resolve('/clips')}>Clips</a>
-    <a href={resolve('/record')}>Record</a>
-    <a href={resolve('/videos')}>Videos</a>
-  </div>
-</nav>
+<Background />
+<Nav />
 
 <section class="hero">
   <p class="label">cime clip app</p>
@@ -62,7 +40,7 @@
         <li>녹화 시작 버튼 클릭</li>
         <li>원할 때 녹화 중지</li>
       </ol>
-      <a href={resolve('/record')} class="feature-btn">녹화 시작하기 →</a>
+      <a href={resolve('/recording')} class="feature-btn">녹화 시작하기 →</a>
     </div>
 
     <div class="feature-card">

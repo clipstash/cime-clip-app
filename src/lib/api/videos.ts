@@ -6,8 +6,8 @@ export type Video = {
   total_time?: string | null;
   status?: string;
   title?: string;
-  file_size?: number;
-  s3_url?: string;
+  file_size?: string | number;
+  file_url?: string;
   error_message?: string;
   [key: string]: unknown;
 };
