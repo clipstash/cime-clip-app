@@ -26,3 +26,8 @@ export async function createClip(url: string, startTime: number, endTime: number
   });
   if (!res.ok) throw new Error('요청 실패');
 }
+
+export async function deleteClip(id: string): Promise<void> {
+  const res = await fetch(`${API_URL}/clips/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('삭제 실패');
+}

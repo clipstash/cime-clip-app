@@ -207,6 +207,11 @@ h2 {
   justify-content: space-between;
   align-items: center;
 }
+.clip-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
 .platform {
   font-size: 0.7rem;
   color: #555;
@@ -254,4 +259,19 @@ h2 {
   color: #f87171;
   line-height: 1.4;
   word-break: break-all;
+}
+.delete-btn {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid #5a2020;
+  border-radius: 0.3rem;
+  padding: 0.1rem 0.45rem;
+  color: #f87171;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.delete-btn:hover {
+  background: #2a1010;
 }

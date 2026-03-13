@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import '../styles/page.css';
-  import { getClips, createClip, type Clip } from '$lib/api/clips';
+  import { getClips, createClip, deleteClip, type Clip } from '$lib/api/clips';
 
   let url = $state('');
   let startTime = $state(0);
@@ -41,6 +41,15 @@
     if (status === 'failed') return '❌ 실패';
     if (status === 'processing') return '⏳ 처리중';
     return '🕐 대기중';
+  }
+
+  async function removeClip(id: string) {
+    try {
+      await deleteClip(id);
+      clips = clips.filter((c) => c.id !== id);
+    } catch (e: any) {
+      errorMsg = e.message;
+    }
   }
 
   onMount(() => {
@@ -117,10 +126,13 @@
       {#each clips as clip}
         <div class="clip-card">
           <div class="clip-header">
-            <span class="platform">{clip.platform}</span>
-            <span class="status" style="color: {statusColor(clip.status)}">
-              {statusLabel(clip.status)}
-            </span>
+            <div class="clip-header-left">
+              <span class="platform">{clip.platform}</span>
+              <span class="status" style="color: {statusColor(clip.status)}">
+                {statusLabel(clip.status)}
+              </span>
+            </div>
+            <button class="delete-btn" onclick={() => removeClip(clip.id)} aria-label="삭제">×</button>
           </div>
           <p class="clip-title">{clip.title ?? '정보 로딩 중...'}</p>
           <p class="clip-sub">{clip.streamer ?? '-'}</p>
