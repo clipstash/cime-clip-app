@@ -1,62 +1,7 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { resolve } from '$app/paths';
   import '../styles/page.css';
-  import { getClips, createClip, deleteClip, type Clip } from '$lib/api/clips';
-
-  let url = $state('');
-  let startTime = $state(0);
-  let endTime = $state(30);
-  let loading = $state(false);
-  let clips = $state<Clip[]>([]);
-  let errorMsg = $state('');
-
-  async function fetchClips() {
-    clips = await getClips();
-  }
-
-  async function submitClip() {
-    if (!url) return;
-    loading = true;
-    errorMsg = '';
-    try {
-      await createClip(url, startTime, endTime);
-      await fetchClips();
-      url = '';
-    } catch (e: any) {
-      errorMsg = e.message;
-    } finally {
-      loading = false;
-    }
-  }
-
-  function statusColor(status: string) {
-    if (status === 'completed') return '#4ade80';
-    if (status === 'failed') return '#f87171';
-    if (status === 'processing') return '#facc15';
-    return '#888888';
-  }
-
-  function statusLabel(status: string) {
-    if (status === 'completed') return '✅ 완료';
-    if (status === 'failed') return '❌ 실패';
-    if (status === 'processing') return '⏳ 처리중';
-    return '🕐 대기중';
-  }
-
-  async function removeClip(id: string) {
-    try {
-      await deleteClip(id);
-      clips = clips.filter((c) => c.id !== id);
-    } catch (e: any) {
-      errorMsg = e.message;
-    }
-  }
-
-  onMount(() => {
-    fetchClips();
-    const interval = setInterval(fetchClips, 3000);
-    return () => clearInterval(interval);
-  });
+  import '../styles/landing.css';
 </script>
 
 <div class="bg-gradient"></div>
@@ -77,79 +22,60 @@
 
 <nav>
   <div class="nav-left">
-    <a href="/">ClipDown</a>
+    <a href={resolve('/')}>ClipDown</a>
   </div>
   <div class="nav-right">
-    <span>Clips</span>
-    <span>About</span>
+    <a href={resolve('/clips')}>Clips</a>
+    <a href={resolve('/record')}>Record</a>
+    <a href={resolve('/videos')}>Videos</a>
   </div>
 </nav>
 
 <section class="hero">
-  <p class="label">cime clip downloader</p>
+  <p class="label">cime clip app</p>
   <h1>Download.<br/>Clip. Share.</h1>
-  <p class="desc">씨미 라이브 클립을 원하는 구간만<br/>빠르게 다운로드하세요.</p>
-
-  <div class="form-card">
-    <div class="form-row">
-      <input
-        type="text"
-        placeholder="URL을 입력하세요"
-        bind:value={url}
-      />
-    </div>
-    <div class="form-row time-row">
-      <div class="time-input">
-        <label for="start-time">시작 (초)</label>
-        <input id="start-time" type="number" bind:value={startTime} min="0" />
-      </div>
-      <div class="time-input">
-        <label for="end-time">종료 (초)</label>
-        <input id="end-time" type="number" bind:value={endTime} min="1" />
-      </div>
-      <button onclick={submitClip} disabled={loading}>
-        {loading ? '처리중...' : '클립 생성 ✦'}
-      </button>
-    </div>
-    {#if errorMsg}
-      <p class="error">{errorMsg}</p>
-    {/if}
-  </div>
+  <p class="desc">씨미 라이브를 가장 쉽게 저장하는 방법.<br/>클립 다운로드부터 실시간 녹화까지.</p>
 </section>
 
-<section class="clips-section">
-  <h2>클립 목록</h2>
-  {#if clips.length === 0}
-    <p class="empty">아직 클립이 없어요. URL을 입력해 첫 클립을 만들어보세요!</p>
-  {:else}
-    <div class="clips-grid">
-      {#each clips as clip}
-        <div class="clip-card">
-          <div class="clip-header">
-            <div class="clip-header-left">
-              <span class="platform">{clip.platform}</span>
-              <span class="status" style="color: {statusColor(clip.status)}">
-                {statusLabel(clip.status)}
-              </span>
-            </div>
-            <button class="delete-btn" onclick={() => removeClip(clip.id)} aria-label="삭제">×</button>
-          </div>
-          <p class="clip-title">{clip.title ?? '정보 로딩 중...'}</p>
-          <p class="clip-sub">{clip.streamer ?? '-'}</p>
-          <div class="clip-meta">
-            <span>{clip.start_time}s ~ {clip.end_time}s</span>
-            {#if clip.file_size}
-              <span>{(clip.file_size / 1024 / 1024).toFixed(1)} MB</span>
-            {/if}
-          </div>
-          {#if clip.s3_url && clip.status === 'completed'}
-            <a class="download-btn" href={clip.s3_url} download>다운로드</a>
-          {/if}
-          {#if clip.error_message}
-            <p class="clip-error">{clip.error_message}</p>
-          {/if}
-        </div>
-      {/each}
+<section class="feature-section">
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="feature-icon">✂️</div>
+      <h3>클립 다운로드</h3>
+      <p class="feature-desc">방송 URL과 원하는 구간을 입력하면 해당 부분만 잘라서 저장합니다.</p>
+      <ol class="manual-steps">
+        <li>방송 URL 입력</li>
+        <li>시작 · 종료 시간 (초) 설정</li>
+        <li>클립 생성 버튼 클릭</li>
+        <li>완료 후 다운로드</li>
+      </ol>
+      <a href={resolve('/clips')} class="feature-btn">클립 만들기 →</a>
     </div>
-  {/if}
+
+    <div class="feature-card">
+      <div class="feature-icon">⏺️</div>
+      <h3>라이브 녹화</h3>
+      <p class="feature-desc">씨미 라이브 방송을 실시간으로 녹화합니다. 방송이 끝나기 전에 저장하세요.</p>
+      <ol class="manual-steps">
+        <li>스트림 URL 입력</li>
+        <li>저장할 파일명 입력</li>
+        <li>녹화 시작 버튼 클릭</li>
+        <li>원할 때 녹화 중지</li>
+      </ol>
+      <a href={resolve('/record')} class="feature-btn">녹화 시작하기 →</a>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">🎬</div>
+      <h3>풀 영상 다운로드</h3>
+      <p class="feature-desc">씨미 라이브 영상 전체를 다운로드합니다. URL만 입력하면 끝.</p>
+      <ol class="manual-steps">
+        <li>영상 URL 입력</li>
+        <li>총 시간 입력 (선택)</li>
+        <li>다운로드 버튼 클릭</li>
+        <li>완료 후 저장</li>
+      </ol>
+      <a href={resolve('/videos')} class="feature-btn">다운로드하기 →</a>
+    </div>
+  </div>
 </section>

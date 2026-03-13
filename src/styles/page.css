@@ -63,6 +63,15 @@ nav a {
   font-size: 0.9rem;
   cursor: pointer;
 }
+.nav-right a {
+  color: #888;
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: color 0.2s;
+}
+.nav-right a:hover {
+  color: #ccc;
+}
 
 .hero {
   position: relative;
@@ -88,7 +97,48 @@ h1 {
   color: #888;
   font-size: 1rem;
   line-height: 1.7;
-  margin-bottom: 3rem;
+  margin-bottom: 2rem;
+}
+
+.hero-actions {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2.5rem;
+}
+
+.hero-btn {
+  display: inline-block;
+  padding: 0.65rem 1.6rem;
+  border: 1px solid #7c3aed88;
+  border-radius: 2rem;
+  color: #c084fc;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  letter-spacing: 0.3px;
+  background: transparent;
+  position: relative;
+  overflow: hidden;
+  transition: color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hero-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #7c3aed22, #a78bfa11);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.hero-btn:hover {
+  color: #e9d5ff;
+  border-color: #a78bfacc;
+  box-shadow: 0 0 18px #7c3aed44;
+}
+
+.hero-btn:hover::before {
+  opacity: 1;
 }
 
 .form-card {
