@@ -4,11 +4,37 @@
   import { getClips, createClip, deleteClip, type Clip } from '$lib/api/clips';
 
   let url = $state('');
-  let startTime = $state(0);
-  let endTime = $state(30);
+  let startH = $state(0);
+  let startM = $state(0);
+  let startS = $state(0);
+  let endH = $state(0);
+  let endM = $state(0);
+  let endS = $state(30);
+  let focusedField = $state<string | null>(null);
   let loading = $state(false);
   let clips = $state<Clip[]>([]);
   let errorMsg = $state('');
+
+  const fieldMap: Record<string, { get: () => number; set: (v: number) => void; max: number }> = {
+    startH: { get: () => startH, set: (v) => (startH = v), max: Infinity },
+    startM: { get: () => startM, set: (v) => (startM = v), max: 59 },
+    startS: { get: () => startS, set: (v) => (startS = v), max: 59 },
+    endH:   { get: () => endH,   set: (v) => (endH = v),   max: Infinity },
+    endM:   { get: () => endM,   set: (v) => (endM = v),   max: 59 },
+    endS:   { get: () => endS,   set: (v) => (endS = v),   max: 59 },
+  };
+
+  function step(delta: number, group: 'start' | 'end') {
+    const key = focusedField ?? (group === 'start' ? 'startS' : 'endS');
+    const field = fieldMap[key];
+    if (!field) return;
+    const next = Math.max(0, Math.min(field.max, field.get() + delta));
+    field.set(next);
+  }
+
+  function toSeconds(h: number, m: number, s: number) {
+    return h * 3600 + m * 60 + s;
+  }
 
   async function fetchClips() {
     clips = await getClips();
@@ -19,7 +45,7 @@
     loading = true;
     errorMsg = '';
     try {
-      await createClip(url, startTime, endTime);
+      await createClip(url, toSeconds(startH, startM, startS), toSeconds(endH, endM, endS));
       await fetchClips();
       url = '';
     } catch (e: any) {
@@ -101,14 +127,40 @@
     </div>
     <div class="form-row time-row">
       <div class="time-input">
-        <label for="start-time">시작 (초)</label>
-        <input id="start-time" type="number" bind:value={startTime} min="0" />
+        <label>시작</label>
+        <div class="hms-inputs">
+          <input type="number" bind:value={startH} min="0" aria-label="시작 시"
+            onfocus={() => (focusedField = 'startH')} />
+          <span class="hms-sep">:</span>
+          <input type="number" bind:value={startM} min="0" max="59" aria-label="시작 분"
+            onfocus={() => (focusedField = 'startM')} />
+          <span class="hms-sep">:</span>
+          <input type="number" bind:value={startS} min="0" max="59" aria-label="시작 초"
+            onfocus={() => (focusedField = 'startS')} />
+          <div class="hms-stepper">
+            <button type="button" class="step-btn" onmousedown={(e) => { e.preventDefault(); step(1, 'start'); }}>▲</button>
+            <button type="button" class="step-btn" onmousedown={(e) => { e.preventDefault(); step(-1, 'start'); }}>▼</button>
+          </div>
+        </div>
       </div>
       <div class="time-input">
-        <label for="end-time">종료 (초)</label>
-        <input id="end-time" type="number" bind:value={endTime} min="1" />
+        <label>종료</label>
+        <div class="hms-inputs">
+          <input type="number" bind:value={endH} min="0" aria-label="종료 시"
+            onfocus={() => (focusedField = 'endH')} />
+          <span class="hms-sep">:</span>
+          <input type="number" bind:value={endM} min="0" max="59" aria-label="종료 분"
+            onfocus={() => (focusedField = 'endM')} />
+          <span class="hms-sep">:</span>
+          <input type="number" bind:value={endS} min="0" max="59" aria-label="종료 초"
+            onfocus={() => (focusedField = 'endS')} />
+          <div class="hms-stepper">
+            <button type="button" class="step-btn" onmousedown={(e) => { e.preventDefault(); step(1, 'end'); }}>▲</button>
+            <button type="button" class="step-btn" onmousedown={(e) => { e.preventDefault(); step(-1, 'end'); }}>▼</button>
+          </div>
+        </div>
       </div>
-      <button onclick={submitClip} disabled={loading}>
+      <button class="submit-btn" onclick={submitClip} disabled={loading}>
         {loading ? '처리중...' : '클립 생성 ✦'}
       </button>
     </div>
