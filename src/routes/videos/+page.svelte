@@ -132,10 +132,10 @@
 </section>
 
 {#if showModal}
-  <div class="modal-backdrop" onclick={closeModal} role="presentation">
-    <div class="modal-box" onclick={(e) => e.stopPropagation()} role="dialog">
+  <div class="modal-backdrop" onclick={closeModal} onkeydown={(e) => e.key === 'Escape' && closeModal()} role="presentation">
+    <div class="modal-box" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
       <button class="modal-close" onclick={closeModal} aria-label="닫기">×</button>
-      <video class="modal-video" src={modalUrl} controls autoplay></video>
+      <video class="modal-video" src={modalUrl} controls autoplay><track kind="captions" /></video>
     </div>
   </div>
 {/if}

@@ -247,7 +247,7 @@
       onloadedmetadata={() => {
         if (probeEl && isFinite(probeEl.duration)) totalSec = Math.floor(probeEl.duration);
       }}
-    ></video>
+    ><track kind="captions" /></video>
   {/if}
 
   <!-- 소스 영상 미리보기 -->
@@ -269,7 +269,7 @@
           }}
           ontimeupdate={() => { if (videoEl) videoCurrentTime = videoEl.currentTime; }}
           onerror={() => { videoError = true; videoLoaded = false; }}
-        ></video>
+        ><track kind="captions" /></video>
       {:else}
         <div class="video-error">직접 미리보기를 지원하지 않는 URL입니다.</div>
       {/if}
@@ -316,10 +316,10 @@
 </section>
 
 {#if showModal}
-  <div class="modal-backdrop" onclick={closeModal} role="presentation">
-    <div class="modal-box" onclick={(e) => e.stopPropagation()} role="dialog">
+  <div class="modal-backdrop" onclick={closeModal} onkeydown={(e) => e.key === 'Escape' && closeModal()} role="presentation">
+    <div class="modal-box" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
       <button class="modal-close" onclick={closeModal} aria-label="닫기">×</button>
-      <video class="modal-video" src={modalUrl} controls autoplay></video>
+      <video class="modal-video" src={modalUrl} controls autoplay><track kind="captions" /></video>
     </div>
   </div>
 {/if}
