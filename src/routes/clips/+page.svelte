@@ -4,6 +4,7 @@
   import '../../styles/page.css';
   import { getClips, createClip, deleteClip, type Clip } from '$lib/api/clips';
   import { statusColor, statusLabel } from '$lib/utils/status';
+  import { localUrl } from '$lib/utils/url';
   import Background from '$lib/components/Background.svelte';
   import Nav from '$lib/components/Nav.svelte';
 
@@ -93,10 +94,6 @@
     const s = sec % 60;
     if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     return `${m}:${String(s).padStart(2, '0')}`;
-  }
-
-  function localUrl(u?: string) {
-    return u ? u.replace(/^https?:\/\/localhost:\d+/, '') : '';
   }
 
   function openSourcePreview() {

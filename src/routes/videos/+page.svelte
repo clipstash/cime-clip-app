@@ -4,6 +4,7 @@
   import '../../styles/page.css';
   import { getVideos, createVideo, deleteVideo, type Video } from '$lib/api/videos';
   import { statusColor, statusLabel } from '$lib/utils/status';
+  import { localUrl } from '$lib/utils/url';
   import Background from '$lib/components/Background.svelte';
   import Nav from '$lib/components/Nav.svelte';
 
@@ -15,10 +16,6 @@
 
   let modalUrl = $state('');
   let showModal = $state(false);
-
-  function localUrl(u?: string) {
-    return u ? u.replace(/^https?:\/\/localhost:\d+/, '') : '';
-  }
 
   function openModal(fileUrl: string) {
     modalUrl = localUrl(fileUrl);

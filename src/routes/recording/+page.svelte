@@ -7,6 +7,7 @@
     getActiveRecords, getRecord, type ActiveRecord
   } from '$lib/api/record';
   import { statusColor, statusLabel } from '$lib/utils/status';
+  import { localUrl } from '$lib/utils/url';
   import Background from '$lib/components/Background.svelte';
   import Nav from '$lib/components/Nav.svelte';
 
@@ -16,6 +17,7 @@
   let errorMsg = $state('');
   let records = $state<ActiveRecord[]>([]);
   let pausedSet = $state(new Set<string>());
+  let pausePending = $state(new Set<string>());  // pause/resume 요청 진행 중인 filename
 
   let modalUrl = $state('');
   let showModal = $state(false);
@@ -30,24 +32,27 @@
     modalUrl = '';
   }
 
-  function localUrl(u?: string | null) {
-    return u ? u.replace(/^https?:\/\/localhost:\d+/, '') : '';
-  }
-
   async function fetchActive() {
     const { active, paused } = await getActiveRecords();
+    // pause/resume 요청이 진행 중인 항목은 서버 값으로 덮어쓰지 않음
+    for (const filename of pausePending) {
+      if (pausedSet.has(filename)) paused.add(filename);
+      else paused.delete(filename);
+    }
     pausedSet = paused;
     const activeNames = new Set(active.map((r) => r.filename));
 
     // active_list는 id가 없으므로 기존 레코드의 id를 유지
+    // stopping 상태인 레코드는 서버 응답으로 덮어쓰지 않음
     const mergedActive = active.map((r) => {
       const existing = records.find((e) => e.filename === r.filename);
+      if (existing?.status === 'stopping') return existing;
       return existing?.id ? { ...r, id: existing.id } : r;
     });
 
     const refreshed = await Promise.all(
       records
-        .filter((r) => !activeNames.has(r.filename))
+        .filter((r) => !activeNames.has(r.filename) && r.status !== 'completed' && r.status !== 'failed')
         .map(async (r) => {
           if (!r.id) return r;
           const fresh = await getRecord(r.id);
@@ -55,7 +60,9 @@
         })
     );
 
-    records = [...mergedActive, ...refreshed];
+    // 완료/실패 상태는 그대로 유지
+    const terminal = records.filter((r) => !activeNames.has(r.filename) && (r.status === 'completed' || r.status === 'failed'));
+    records = [...mergedActive, ...refreshed, ...terminal];
   }
 
   async function submitRecord() {
@@ -75,20 +82,30 @@
   }
 
   async function handlePause(filename: string) {
+    pausedSet = new Set([...pausedSet, filename]);
+    pausePending = new Set([...pausePending, filename]);
     try {
-      await pauseRecord(filename);
-      pausedSet = new Set([...pausedSet, filename]);
+      const updated = await pauseRecord(filename);
+      records = records.map((r) => r.filename === filename ? { ...r, ...updated } : r);
     } catch (e) {
+      pausedSet = new Set([...pausedSet].filter((f) => f !== filename));
       errorMsg = e instanceof Error ? e.message : String(e);
+    } finally {
+      pausePending = new Set([...pausePending].filter((f) => f !== filename));
     }
   }
 
   async function handleResume(filename: string) {
+    pausedSet = new Set([...pausedSet].filter((f) => f !== filename));
+    pausePending = new Set([...pausePending, filename]);
     try {
-      await resumeRecord(filename);
-      pausedSet = new Set([...pausedSet].filter((f) => f !== filename));
+      const updated = await resumeRecord(filename);
+      records = records.map((r) => r.filename === filename ? { ...r, ...updated } : r);
     } catch (e) {
+      pausedSet = new Set([...pausedSet, filename]);
       errorMsg = e instanceof Error ? e.message : String(e);
+    } finally {
+      pausePending = new Set([...pausePending].filter((f) => f !== filename));
     }
   }
 
@@ -135,7 +152,7 @@
 
   <div class="tab-toggle">
     <button onclick={() => goto('/clips')}>클립</button>
-    <button onclick={() => goto('/clips')}>비디오</button>
+    <button onclick={() => goto('/videos')}>비디오</button>
     <button class="tab-active">녹화</button>
   </div>
 

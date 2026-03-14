@@ -29,6 +29,11 @@
     errorMsg = '';
     try {
       const isoAt = new Date(scheduledAt).toISOString();
+      if (new Date(scheduledAt) <= new Date()) {
+        errorMsg = '예약 시각은 현재 시각보다 이후여야 합니다.';
+        loading = false;
+        return;
+      }
       await createSchedule(url, fileName, isoAt, duration !== '' ? Number(duration) : null);
       url = '';
       fileName = '';
@@ -111,6 +116,7 @@
     </div>
     <div class="form-row">
       <button
+        class="submit-btn"
         onclick={submitSchedule}
         disabled={loading || !url || !fileName || !scheduledAt}
       >

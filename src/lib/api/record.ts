@@ -1,10 +1,10 @@
-const API_URL = '/api/v1';
+import { API_URL } from './config';
 
 export type ActiveRecord = {
   id: string;
   filename: string;
   url: string;
-  status: string;
+  status: 'processing' | 'completed' | 'failed' | 'stopping';
   file_url?: string | null;
   error_message: string | null;
   started_at: string | null;
