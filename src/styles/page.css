@@ -539,6 +539,34 @@ h2 {
   max-height: 70vh;
 }
 
+/* ── Tab Toggle ── */
+.tab-toggle {
+  display: inline-flex;
+  gap: 0;
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 0.6rem;
+  padding: 0.25rem;
+  margin-bottom: 1.5rem;
+}
+.tab-toggle button {
+  background: transparent;
+  border: none;
+  border-radius: 0.4rem;
+  padding: 0.45rem 1.4rem;
+  color: #555;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.tab-toggle button:hover { color: #aaa; }
+.tab-toggle button.tab-active {
+  background: #fff;
+  color: #000;
+  font-weight: 700;
+}
+
 /* ── Recording ── */
 .record-row {
   display: flex;
@@ -577,6 +605,31 @@ h2 {
   animation: blink 1.2s ease-in-out infinite;
   flex-shrink: 0;
 }
+.rec-dot.paused {
+  background: #facc15;
+  animation: none;
+  opacity: 0.8;
+}
+.rec-controls {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+.rec-btn {
+  flex: 1;
+  border: none;
+  border-radius: 0.4rem;
+  padding: 0.4rem 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.rec-btn:hover { opacity: 0.8; }
+.rec-btn-pause  { background: #2a2a2a; color: #facc15; border: 1px solid #3a3a1a; }
+.rec-btn-resume { background: #1a2a1a; color: #4ade80; border: 1px solid #2a4a2a; }
+.rec-btn-stop   { background: #1a1a2a; color: #a78bfa; border: 1px solid #2a2a4a; }
+.rec-btn-cancel { background: #2a1010; color: #f87171; border: 1px solid #4a2020; }
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.2; }

@@ -1,9 +1,13 @@
 const API_URL = '/api/v1';
 
 export type ActiveRecord = {
+  id: string;
   filename: string;
-  url?: string;
-  [key: string]: unknown;
+  url: string;
+  status: string;
+  file_url?: string | null;
+  error_message: string | null;
+  started_at: string | null;
 };
 
 export type RecordSchedule = {
@@ -17,28 +21,64 @@ export type RecordSchedule = {
   created_at: string;
 };
 
-export async function startRecord(url: string, file_name: string): Promise<void> {
+export async function startRecord(url: string, file_name: string): Promise<ActiveRecord> {
   const res = await fetch(`${API_URL}/record/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url, filename: file_name })
   });
-  if (!res.ok) throw new Error('녹화 시작 실패');
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail ?? '녹화 시작 실패');
+  }
+  return res.json();
 }
 
-export async function stopRecord(filename: string): Promise<void> {
+export async function stopRecord(filename: string): Promise<ActiveRecord> {
   const res = await fetch(`${API_URL}/record/stop/${encodeURIComponent(filename)}`, {
     method: 'POST'
   });
-  if (!res.ok) throw new Error('녹화 중지 실패');
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail ?? '녹화 중지 실패');
+  }
+  return res.json();
 }
 
-export async function getActiveRecords(): Promise<ActiveRecord[]> {
+export async function getRecord(id: string): Promise<ActiveRecord | null> {
+  const res = await fetch(`${API_URL}/record/${encodeURIComponent(id)}`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function getActiveRecords(): Promise<{ active: ActiveRecord[]; paused: Set<string> }> {
   const res = await fetch(`${API_URL}/record/active`);
-  if (!res.ok) return [];
+  if (!res.ok) return { active: [], paused: new Set() };
   const data = await res.json();
   const list: string[] = Array.isArray(data?.active_list) ? data.active_list : [];
-  return list.map((filename) => ({ filename }));
+  const pausedList: string[] = Array.isArray(data?.paused_list) ? data.paused_list : [];
+  return {
+    active: list.map((filename) => ({ id: '', filename, url: '', status: 'processing', error_message: null, started_at: null })),
+    paused: new Set(pausedList),
+  };
+}
+
+export async function pauseRecord(filename: string): Promise<ActiveRecord> {
+  const res = await fetch(`${API_URL}/record/pause/${encodeURIComponent(filename)}`, { method: 'POST' });
+  if (!res.ok) { const err = await res.json().catch(() => null); throw new Error(err?.detail ?? '일시멈춤 실패'); }
+  return res.json();
+}
+
+export async function resumeRecord(filename: string): Promise<ActiveRecord> {
+  const res = await fetch(`${API_URL}/record/resume/${encodeURIComponent(filename)}`, { method: 'POST' });
+  if (!res.ok) { const err = await res.json().catch(() => null); throw new Error(err?.detail ?? '재개 실패'); }
+  return res.json();
+}
+
+export async function cancelRecord(filename: string): Promise<ActiveRecord> {
+  const res = await fetch(`${API_URL}/record/cancel/${encodeURIComponent(filename)}`, { method: 'POST' });
+  if (!res.ok) { const err = await res.json().catch(() => null); throw new Error(err?.detail ?? '취소 실패'); }
+  return res.json();
 }
 
 export async function getSchedules(skip = 0, limit = 20): Promise<RecordSchedule[]> {

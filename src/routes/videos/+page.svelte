@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import '../../styles/page.css';
   import { getVideos, createVideo, deleteVideo, type Video } from '$lib/api/videos';
   import { statusColor, statusLabel } from '$lib/utils/status';
@@ -72,6 +73,12 @@
   <p class="label">cime video downloader</p>
   <h1>Download.<br/>Full. Video.</h1>
   <p class="desc">씨미 라이브 영상 전체를<br/>빠르게 다운로드하세요.</p>
+
+  <div class="tab-toggle">
+    <button onclick={() => goto('/clips')}>클립</button>
+    <button class="tab-active">비디오</button>
+    <button onclick={() => goto('/recording')}>녹화</button>
+  </div>
 
   <div class="form-card">
     <div class="form-row">
