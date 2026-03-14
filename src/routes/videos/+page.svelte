@@ -12,6 +12,23 @@
   let videos = $state<Video[]>([]);
   let errorMsg = $state('');
 
+  let modalUrl = $state('');
+  let showModal = $state(false);
+
+  function localUrl(u?: string) {
+    return u ? u.replace(/^https?:\/\/localhost:\d+/, '') : '';
+  }
+
+  function openModal(fileUrl: string) {
+    modalUrl = localUrl(fileUrl);
+    showModal = true;
+  }
+
+  function closeModal() {
+    showModal = false;
+    modalUrl = '';
+  }
+
   async function fetchVideos() {
     videos = await getVideos();
   }
@@ -58,23 +75,14 @@
 
   <div class="form-card">
     <div class="form-row">
-      <input
-        type="text"
-        placeholder="URL을 입력하세요"
-        bind:value={url}
-      />
+      <input type="text" placeholder="URL을 입력하세요" bind:value={url} />
     </div>
     <div class="form-row time-row">
       <div class="time-input">
         <label for="total-time">총 시간 (선택)</label>
-        <input
-          id="total-time"
-          type="text"
-          placeholder="예: 01:30:00"
-          bind:value={totalTime}
-        />
+        <input id="total-time" type="text" placeholder="예: 01:30:00" bind:value={totalTime} />
       </div>
-      <button onclick={submitVideo} disabled={loading || !url}>
+      <button class="submit-btn" onclick={submitVideo} disabled={loading || !url}>
         {loading ? '처리중...' : '다운로드 ✦'}
       </button>
     </div>
@@ -105,15 +113,14 @@
           </div>
           <p class="clip-title">{video.title ?? video.url}</p>
           <div class="clip-meta">
-            {#if video.total_time}
-              <span>총 시간: {video.total_time}</span>
-            {/if}
-            {#if video.file_size}
-              <span>{(Number(video.file_size) / 1024 / 1024).toFixed(1)} MB</span>
-            {/if}
+            {#if video.total_time}<span>총 시간: {video.total_time}</span>{/if}
+            {#if video.file_size}<span>{(Number(video.file_size) / 1024 / 1024).toFixed(1)} MB</span>{/if}
           </div>
           {#if video.file_url && video.status === 'completed'}
-            <a class="download-btn" href={video.file_url} download>다운로드</a>
+            <div class="clip-actions">
+              <button class="preview-card-btn" onclick={() => openModal(video.file_url!)}>미리보기</button>
+              <a class="download-btn" href={localUrl(video.file_url)} download>다운로드</a>
+            </div>
           {/if}
           {#if video.error_message}
             <p class="clip-error">{video.error_message}</p>
@@ -123,3 +130,12 @@
     </div>
   {/if}
 </section>
+
+{#if showModal}
+  <div class="modal-backdrop" onclick={closeModal} role="presentation">
+    <div class="modal-box" onclick={(e) => e.stopPropagation()} role="dialog">
+      <button class="modal-close" onclick={closeModal} aria-label="닫기">×</button>
+      <video class="modal-video" src={modalUrl} controls autoplay></video>
+    </div>
+  </div>
+{/if}

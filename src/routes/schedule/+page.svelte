@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import '../../styles/page.css';
-  import '../../styles/record.css';
   import {
     getSchedules,
     createSchedule,

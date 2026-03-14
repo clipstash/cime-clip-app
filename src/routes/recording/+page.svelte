@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import '../../styles/page.css';
-  import '../../styles/record.css';
   import { startRecord, stopRecord, getActiveRecords, type ActiveRecord } from '$lib/api/record';
   import Background from '$lib/components/Background.svelte';
   import Nav from '$lib/components/Nav.svelte';

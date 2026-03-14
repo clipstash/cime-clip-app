@@ -1,7 +1,6 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import '../styles/page.css';
-  import '../styles/landing.css';
   import Background from '$lib/components/Background.svelte';
   import Nav from '$lib/components/Nav.svelte';
 </script>
