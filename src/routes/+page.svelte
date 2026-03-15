@@ -18,41 +18,15 @@
   <div class="feature-grid">
     <div class="feature-card">
       <div class="feature-icon">✂️</div>
-      <h3>클립 다운로드</h3>
-      <p class="feature-desc">방송 URL과 원하는 구간을 입력하면 해당 부분만 잘라서 저장합니다.</p>
+      <h3>클립 · 녹화 · 다운로드</h3>
+      <p class="feature-desc">구간 클립 생성, 실시간 녹화, 풀 영상 다운로드를 한 곳에서.</p>
       <ol class="manual-steps">
         <li>방송 URL 입력</li>
-        <li>시작 · 종료 시간 (초) 설정</li>
-        <li>클립 생성 버튼 클릭</li>
+        <li>원하는 작업 탭 선택</li>
+        <li>옵션 설정 후 실행</li>
         <li>완료 후 다운로드</li>
       </ol>
-      <a href={resolve('/clips')} class="feature-btn">클립 만들기 →</a>
-    </div>
-
-    <div class="feature-card">
-      <div class="feature-icon">⏺️</div>
-      <h3>라이브 녹화</h3>
-      <p class="feature-desc">씨미 라이브 방송을 실시간으로 녹화합니다. 방송이 끝나기 전에 저장하세요.</p>
-      <ol class="manual-steps">
-        <li>스트림 URL 입력</li>
-        <li>저장할 파일명 입력</li>
-        <li>녹화 시작 버튼 클릭</li>
-        <li>원할 때 녹화 중지</li>
-      </ol>
-      <a href={resolve('/clips')} class="feature-btn">녹화 시작하기 →</a>
-    </div>
-
-    <div class="feature-card">
-      <div class="feature-icon">🎬</div>
-      <h3>풀 영상 다운로드</h3>
-      <p class="feature-desc">씨미 라이브 영상 전체를 다운로드합니다. URL만 입력하면 끝.</p>
-      <ol class="manual-steps">
-        <li>영상 URL 입력</li>
-        <li>총 시간 입력 (선택)</li>
-        <li>다운로드 버튼 클릭</li>
-        <li>완료 후 저장</li>
-      </ol>
-      <a href={resolve('/clips')} class="feature-btn">다운로드하기 →</a>
+      <a href={resolve('/clips')} class="feature-btn">바로 가기 →</a>
     </div>
 
     <div class="feature-card">
@@ -65,7 +39,7 @@
         <li>예약 시각 설정</li>
         <li>녹화 시간 설정 (선택)</li>
       </ol>
-      <a href={resolve('/recording')} class="feature-btn">예약하기 →</a>
+      <a href={resolve('/schedule')} class="feature-btn">예약하기 →</a>
     </div>
   </div>
 </section>

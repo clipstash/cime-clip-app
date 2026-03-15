@@ -21,6 +21,17 @@ export type RecordSchedule = {
   created_at: string;
 };
 
+export async function fetchStreamTitle(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${API_URL}/record/title?url=${encodeURIComponent(url)}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.filename ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function startRecord(url: string, file_name: string): Promise<ActiveRecord> {
   const res = await fetch(`${API_URL}/record/start`, {
     method: 'POST',
@@ -98,7 +109,10 @@ export async function createSchedule(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url, filename, scheduled_at, duration: duration ?? null })
   });
-  if (!res.ok) throw new Error('스케줄 생성 실패');
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail ?? '스케줄 생성 실패');
+  }
   return res.json();
 }
 
