@@ -28,12 +28,12 @@
     loading = true;
     errorMsg = '';
     try {
-      const isoAt = new Date(scheduledAt).toISOString();
       if (new Date(scheduledAt) <= new Date()) {
         errorMsg = '예약 시각은 현재 시각보다 이후여야 합니다.';
         loading = false;
         return;
       }
+      const isoAt = new Date(scheduledAt).toISOString();
       await createSchedule(url, fileName, isoAt, duration !== '' ? Number(duration) : null);
       url = '';
       fileName = '';
@@ -77,41 +77,22 @@
 
   <div class="form-card">
     <div class="form-row">
-      <input
-        type="text"
-        placeholder="스트림 URL을 입력하세요"
-        bind:value={url}
-      />
+      <input type="text" placeholder="스트림 URL을 입력하세요" bind:value={url} />
     </div>
     <div class="form-row record-row">
       <div class="record-input">
         <label for="sched-filename">파일명</label>
-        <input
-          id="sched-filename"
-          type="text"
-          placeholder="예: stream_20260315"
-          bind:value={fileName}
-        />
+        <input id="sched-filename" type="text" placeholder="예: stream_20260315" bind:value={fileName} />
       </div>
     </div>
     <div class="form-row record-row">
       <div class="record-input">
         <label for="sched-at">예약 시각</label>
-        <input
-          id="sched-at"
-          type="datetime-local"
-          bind:value={scheduledAt}
-        />
+        <input id="sched-at" type="datetime-local" bind:value={scheduledAt} />
       </div>
       <div class="record-input">
         <label for="sched-duration">녹화 시간(초, 선택)</label>
-        <input
-          id="sched-duration"
-          type="number"
-          min="1"
-          placeholder="예: 3600"
-          bind:value={duration}
-        />
+        <input id="sched-duration" type="number" min="1" placeholder="예: 3600" bind:value={duration} />
       </div>
     </div>
     <div class="form-row">
@@ -145,11 +126,7 @@
               </span>
             </div>
             {#if schedule.status === 'pending'}
-              <button
-                class="delete-btn"
-                onclick={() => handleCancel(schedule.id)}
-                aria-label="취소"
-              >×</button>
+              <button class="delete-btn" onclick={() => handleCancel(schedule.id)} aria-label="취소">×</button>
             {/if}
           </div>
           <p class="clip-title">{schedule.filename}</p>

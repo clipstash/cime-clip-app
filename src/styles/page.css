@@ -175,7 +175,7 @@ h1 {
   flex: 1;
   min-width: 0;
 }
-.time-input label {
+.time-input label, .time-input .time-label {
   font-size: 0.75rem;
   color: #666;
 }
@@ -565,6 +565,33 @@ h2 {
   background: #fff;
   color: #000;
   font-weight: 700;
+}
+
+/* ── Sub Tab Toggle (clips/video mode) ── */
+.sub-tab-toggle {
+  display: inline-flex;
+  gap: 0;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 0.5rem;
+  padding: 0.2rem;
+  margin-bottom: 1rem;
+}
+.sub-tab-toggle button {
+  background: transparent;
+  border: none;
+  border-radius: 0.35rem;
+  padding: 0.3rem 1rem;
+  font-size: 0.8rem;
+  color: #666;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.sub-tab-toggle button:hover { color: #aaa; }
+.sub-tab-toggle button.tab-active {
+  background: #2a2a2a;
+  color: #fff;
+  font-weight: 600;
 }
 
 /* ── Recording ── */

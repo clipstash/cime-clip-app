@@ -39,7 +39,7 @@
         <li>녹화 시작 버튼 클릭</li>
         <li>원할 때 녹화 중지</li>
       </ol>
-      <a href={resolve('/recording')} class="feature-btn">녹화 시작하기 →</a>
+      <a href={resolve('/clips')} class="feature-btn">녹화 시작하기 →</a>
     </div>
 
     <div class="feature-card">
@@ -52,7 +52,7 @@
         <li>다운로드 버튼 클릭</li>
         <li>완료 후 저장</li>
       </ol>
-      <a href={resolve('/videos')} class="feature-btn">다운로드하기 →</a>
+      <a href={resolve('/clips')} class="feature-btn">다운로드하기 →</a>
     </div>
 
     <div class="feature-card">
@@ -65,7 +65,7 @@
         <li>예약 시각 설정</li>
         <li>녹화 시간 설정 (선택)</li>
       </ol>
-      <a href={resolve('/schedule')} class="feature-btn">예약하기 →</a>
+      <a href={resolve('/recording')} class="feature-btn">예약하기 →</a>
     </div>
   </div>
 </section>

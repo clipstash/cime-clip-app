@@ -1,5 +1,5 @@
 <script lang="ts">
-  let { active = '' }: { active?: 'clips' | 'videos' | 'recording' | 'schedule' | '' } = $props();
+  let { active = '' }: { active?: 'clips' | 'schedule' | '' } = $props();
 </script>
 
 <nav>
@@ -7,7 +7,7 @@
     <a href="/">ClipDown</a>
   </div>
   <div class="nav-right">
-    <a href="/clips" class={active === 'clips' || active === 'videos' || active === 'recording' ? 'nav-active' : ''}>Download</a>
+    <a href="/clips" class={active === 'clips' ? 'nav-active' : ''}>Download</a>
     <a href="/schedule" class={active === 'schedule' ? 'nav-active' : ''}>Schedule</a>
   </div>
 </nav>
