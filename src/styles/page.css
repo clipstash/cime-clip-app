@@ -862,8 +862,13 @@ h2 {
 }
 .rec-controls {
   display: flex;
+  align-items: center;
   gap: 0.4rem;
-  margin-top: 0.25rem;
+  flex-wrap: wrap;
+}
+.rec-info {
+  font-size: 0.78rem;
+  color: #666;
 }
 .rec-btn {
   flex: 1;
@@ -884,6 +889,31 @@ h2 {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.2; }
 }
+/* ── Browser Download ── */
+.dl-progress {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: #1a1a1a;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: #7c3aed;
+  border-radius: 3px;
+  transition: width 0.2s ease;
+}
+.progress-label {
+  font-size: 0.72rem;
+  color: #555;
+}
+
 .record-card { border-color: #2a1515; }
 .record-card:hover { border-color: #5a2020; }
 .record-url {

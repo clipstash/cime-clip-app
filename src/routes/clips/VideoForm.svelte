@@ -1,36 +1,109 @@
 <script lang="ts">
-  import { createVideo } from '$lib/api/videos';
+  import { FFmpeg } from '@ffmpeg/ffmpeg';
+  import { fetchFile, toBlobURL } from '@ffmpeg/util';
+  import { getStreamInfo, parseM3u8 } from '$lib/api/stream';
+  import { API_URL } from '$lib/api/config';
 
   type Props = {
     url: string;
-    onSuccess: () => void;
+    onSuccess: (info: { title: string | null; url: string }) => void;
   };
 
   const { url, onSuccess }: Props = $props();
 
-  let totalTime = $state('');
-  let loading = $state(false);
   let err = $state('');
 
+  type DlStatus = 'idle' | 'loading' | 'downloading' | 'encoding' | 'done' | 'error';
+  let dlStatus = $state<DlStatus>('idle');
+  let progress = $state(0);
+  let progressLabel = $state('');
+
+  const FFMPEG_CORE_URL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+
   async function submit() {
-    if (!url) return;
-    loading = true; err = '';
+    if (!url || dlStatus !== 'idle') return;
+    dlStatus = 'loading';
+    err = '';
+    progress = 0;
+
     try {
-      await createVideo(url, totalTime || null);
-      totalTime = '';
-      onSuccess();
-    } catch (e) { err = e instanceof Error ? e.message : String(e); }
-    finally { loading = false; }
+      const info = await getStreamInfo(url);
+      if (!info.m3u8_url) throw new Error('스트림 URL을 찾을 수 없습니다');
+
+      const segments = await parseM3u8(info.m3u8_url);
+      if (segments.length === 0) throw new Error('세그먼트를 찾을 수 없습니다');
+
+      const ffmpeg = new FFmpeg();
+      await ffmpeg.load({
+        coreURL: await toBlobURL(`${FFMPEG_CORE_URL}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await toBlobURL(`${FFMPEG_CORE_URL}/ffmpeg-core.wasm`, 'application/wasm')
+      });
+
+      dlStatus = 'downloading';
+      const segNames: string[] = [];
+
+      for (let i = 0; i < segments.length; i++) {
+        const segUrl = `${API_URL}/proxy?url=${encodeURIComponent(segments[i])}`;
+        const data = await fetchFile(segUrl);
+        const name = `seg${String(i).padStart(5, '0')}.ts`;
+        await ffmpeg.writeFile(name, data);
+        segNames.push(name);
+        progress = Math.round(((i + 1) / segments.length) * 80);
+        progressLabel = `${i + 1} / ${segments.length} 세그먼트`;
+      }
+
+      dlStatus = 'encoding';
+      progressLabel = 'MP4 변환 중...';
+      progress = 82;
+
+      const concatList = segNames.map((n) => `file '${n}'`).join('\n');
+      await ffmpeg.writeFile('concat.txt', concatList);
+      await ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', 'concat.txt', '-c', 'copy', 'output.mp4']);
+      progress = 96;
+
+      const raw = (await ffmpeg.readFile('output.mp4')) as Uint8Array;
+      const buf = new ArrayBuffer(raw.byteLength);
+      new Uint8Array(buf).set(raw);
+      const blob = new Blob([buf], { type: 'video/mp4' });
+      const objUrl = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      const safe = (info.title ?? 'video').replace(/[\\/:*?"<>|]/g, '_');
+      a.href = objUrl;
+      a.download = `${safe}.mp4`;
+      a.click();
+      URL.revokeObjectURL(objUrl);
+
+      for (const name of segNames) await ffmpeg.deleteFile(name);
+      await ffmpeg.deleteFile('concat.txt');
+      await ffmpeg.deleteFile('output.mp4');
+
+      progress = 100;
+      progressLabel = '완료!';
+      dlStatus = 'done';
+      onSuccess({ title: info.title, url });
+      setTimeout(() => { dlStatus = 'idle'; progress = 0; progressLabel = ''; }, 3000);
+    } catch (e) {
+      err = e instanceof Error ? e.message : String(e);
+      dlStatus = 'error';
+    }
   }
+
+  const busy = $derived(dlStatus === 'loading' || dlStatus === 'downloading' || dlStatus === 'encoding');
 </script>
 
 <div class="form-row time-row video-action">
   <div class="time-input">
     <span class="time-label" aria-hidden="true">비디오</span>
-    <input type="text" placeholder="총 시간 (선택, 예: 01:30:00)" bind:value={totalTime} />
+    {#if busy}
+      <div class="dl-progress">
+        <div class="progress-bar"><div class="progress-fill" style="width: {progress}%"></div></div>
+        <span class="progress-label">{progressLabel}</span>
+      </div>
+    {/if}
   </div>
-  <button class="submit-btn" onclick={submit} disabled={loading || !url}>
-    {loading ? '처리중...' : '다운로드 ✦'}
+  <button class="submit-btn" onclick={submit} disabled={busy || !url}>
+    {dlStatus === 'done' ? '완료 ✓' : busy ? '처리중...' : '다운로드 ✦'}
   </button>
 </div>
 {#if err}<p class="error">{err}</p>{/if}

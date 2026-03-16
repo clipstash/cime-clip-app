@@ -1,12 +1,8 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import '../../styles/page.css';
-  import { getClips, deleteClip, fetchClipInfo, type Clip } from '$lib/api/clips';
-  import { getVideos, deleteVideo, type Video } from '$lib/api/videos';
-  import {
-    stopRecord, pauseRecord, resumeRecord, cancelRecord,
-    getActiveRecords, getRecord, type ActiveRecord
-  } from '$lib/api/record';
+  import { fetchClipInfo, type Clip } from '$lib/api/clips';
+  import { type Video } from '$lib/api/videos';
+  import { type ActiveRecord } from '$lib/api/record';
   import { localUrl } from '$lib/utils/url';
   import Background from '$lib/components/Background.svelte';
   import Nav from '$lib/components/Nav.svelte';
@@ -58,98 +54,51 @@
   let clips = $state<Clip[]>([]);
   let videos = $state<Video[]>([]);
   let records = $state<ActiveRecord[]>([]);
-  let pausedSet = $state(new Set<string>());
-  let pausePending = $state(new Set<string>());
 
   // ── 모달 ──
   function openModal(fileUrl: string) { modalUrl = localUrl(fileUrl); showModal = true; }
   function closeModal() { showModal = false; modalUrl = ''; }
 
-  // ── Fetch ──
-  async function fetchClips() { clips = await getClips(); }
-  async function fetchVideos() { videos = await getVideos(); }
-
-  async function fetchActive() {
-    const { active, paused } = await getActiveRecords();
-    for (const filename of pausePending) {
-      if (pausedSet.has(filename)) paused.add(filename);
-      else paused.delete(filename);
-    }
-    pausedSet = paused;
-    const activeNames = new Set(active.map((r) => r.filename));
-    const mergedActive = active.map((r) => {
-      const existing = records.find((e) => e.filename === r.filename);
-      if (existing?.status === 'stopping') return existing;
-      return existing ? { ...existing, status: r.status } : r;
-    });
-    const refreshed = await Promise.all(
-      records
-        .filter((r) => !activeNames.has(r.filename) && r.status !== 'completed' && r.status !== 'failed')
-        .map(async (r) => { if (!r.id) return r; const fresh = await getRecord(r.id); return fresh ?? r; })
-    );
-    const terminal = records.filter((r) => !activeNames.has(r.filename) && (r.status === 'completed' || r.status === 'failed'));
-    records = [...mergedActive, ...refreshed, ...terminal];
-  }
-
-  // ── 삭제 / 녹화 컨트롤 ──
-  async function removeClip(id: string) {
-    try { await deleteClip(id); clips = clips.filter((c) => c.id !== id); }
-    catch { /* 무시 */ }
-  }
-
-  async function removeVideo(id: string) {
-    try { await deleteVideo(id); videos = videos.filter((v) => v.id !== id); }
-    catch { /* 무시 */ }
-  }
-
-  async function handlePause(filename: string) {
-    pausedSet = new Set([...pausedSet, filename]);
-    pausePending = new Set([...pausePending, filename]);
-    try {
-      const updated = await pauseRecord(filename);
-      records = records.map((r) => r.filename === filename ? { ...r, ...updated } : r);
-    } catch {
-      pausedSet = new Set([...pausedSet].filter((f) => f !== filename));
-    } finally { pausePending = new Set([...pausePending].filter((f) => f !== filename)); }
-  }
-
-  async function handleResume(filename: string) {
-    pausedSet = new Set([...pausedSet].filter((f) => f !== filename));
-    pausePending = new Set([...pausePending, filename]);
-    try {
-      const updated = await resumeRecord(filename);
-      records = records.map((r) => r.filename === filename ? { ...r, ...updated } : r);
-    } catch {
-      pausedSet = new Set([...pausedSet, filename]);
-    } finally { pausePending = new Set([...pausePending].filter((f) => f !== filename)); }
-  }
-
-  async function handleStop(filename: string) {
-    records = records.map((r) => r.filename === filename ? { ...r, status: 'stopping' } : r);
-    pausedSet = new Set([...pausedSet].filter((f) => f !== filename));
-    try { await stopRecord(filename); } catch { /* 무시 */ }
-  }
-
-  async function handleCancel(filename: string) {
-    records = records.map((r) => r.filename === filename ? { ...r, status: 'stopping' } : r);
-    pausedSet = new Set([...pausedSet].filter((f) => f !== filename));
-    try {
-      const updated = await cancelRecord(filename);
-      records = records.map((r) => r.filename === filename ? updated : r);
-    } catch { /* 무시 */ }
-  }
-
+  // ── 삭제 ──
+  function removeClip(id: string) { clips = clips.filter((c) => c.id !== id); }
+  function removeVideo(id: string) { videos = videos.filter((v) => v.id !== id); }
   function handleRemove(filename: string) { records = records.filter((r) => r.filename !== filename); }
 
-  function handleRecordSuccess(record: ActiveRecord) {
-    records = [record, ...records.filter((r) => r.filename !== record.filename)];
+  // ── 브라우저 다운로드 완료 핸들러 ──
+  function handleClipSuccess(info: { title: string | null; startSec: number; endSec: number }) {
+    const clip: Clip = {
+      id: crypto.randomUUID(),
+      platform: 'browser',
+      status: 'completed',
+      title: info.title ?? undefined,
+      start_time: info.startSec,
+      end_time: info.endSec,
+    };
+    clips = [clip, ...clips];
   }
 
-  onMount(() => {
-    fetchClips(); fetchVideos(); fetchActive();
-    const interval = setInterval(() => { fetchClips(); fetchVideos(); fetchActive(); }, 3000);
-    return () => clearInterval(interval);
-  });
+  function handleVideoSuccess(info: { title: string | null; url: string }) {
+    const video: Video = {
+      id: crypto.randomUUID(),
+      url: info.url,
+      status: 'completed',
+      title: info.title ?? undefined,
+    };
+    videos = [video, ...videos];
+  }
+
+  function handleRecordSuccess(info: { filename: string; url: string }) {
+    const record: ActiveRecord = {
+      id: crypto.randomUUID(),
+      filename: info.filename,
+      url: info.url,
+      status: 'completed',
+      file_url: null,
+      error_message: null,
+      started_at: null,
+    };
+    records = [record, ...records.filter((r) => r.filename !== info.filename)];
+  }
 </script>
 
 <Background />
@@ -170,10 +119,10 @@
     {/if}
 
     <div class="action-divider"></div>
-    <ClipForm {url} {totalSec} {durationLoaded} onSuccess={fetchClips} />
+    <ClipForm {url} {totalSec} {durationLoaded} onSuccess={handleClipSuccess} />
 
     <div class="action-divider"></div>
-    <VideoForm {url} onSuccess={fetchVideos} />
+    <VideoForm {url} onSuccess={handleVideoSuccess} />
 
     <div class="action-divider"></div>
     <RecordForm {url} onSuccess={handleRecordSuccess} />
@@ -197,11 +146,11 @@
       {#each records as record (record.filename)}
         <RecordCard
           {record}
-          isPaused={pausedSet.has(record.filename)}
-          onPause={handlePause}
-          onResume={handleResume}
-          onStop={handleStop}
-          onCancel={handleCancel}
+          isPaused={false}
+          onPause={() => {}}
+          onResume={() => {}}
+          onStop={() => {}}
+          onCancel={() => {}}
           onRemove={handleRemove}
           onPreview={openModal}
         />

@@ -1,42 +1,61 @@
-# sv
+# cime-clip-app
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+ClipDown 프론트엔드 — SvelteKit 기반 영상 클립 다운로드 UI입니다.
 
-## Creating a project
+## 사전 요구사항
 
-If you're seeing this, you've probably already done this step. Congrats!
+| 항목 | 버전 |
+|------|------|
+| Node.js | 18 이상 |
+| npm | 9 이상 |
 
-```sh
-# create a new project
-npx sv create my-app
+백엔드(`cime-clip-server/`)가 `http://localhost:8000`에서 실행 중이어야 합니다.
+
+## 설치 및 실행
+
+```bash
+npm install
+npm run dev       # 개발 서버 (http://localhost:5173)
 ```
 
-To recreate this project with the same configuration:
+## 명령어
 
-```sh
-# recreate this project
-npx sv@0.12.5 create --template minimal --types ts --add tailwindcss="plugins:none" prettier eslint --install npm .
+```bash
+npm run dev       # 개발 서버
+npm run build     # 프로덕션 빌드
+npm run preview   # 빌드 결과 미리보기
+npm run check     # Svelte 타입 체크
+npm run lint      # ESLint + Prettier 검사
+npm run format    # Prettier 자동 포맷
 ```
 
-## Developing
+## 구조
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+```
+src/
+├── lib/
+│   ├── api/
+│   │   ├── clips.ts      # 클립 API 호출
+│   │   ├── videos.ts     # 영상 API 호출
+│   │   └── record.ts     # 녹화 일정 API 호출
+│   └── utils/
+│       ├── status.ts     # 상태 표시 유틸
+│       └── url.ts        # URL 유틸
+└── routes/
+    ├── clips/            # 클립/영상/녹화 관리 페이지
+    │   ├── ClipForm.svelte
+    │   ├── ClipCard.svelte
+    │   ├── VideoForm.svelte
+    │   ├── VideoCard.svelte
+    │   ├── RecordForm.svelte
+    │   ├── RecordCard.svelte
+    │   ├── PreviewModal.svelte
+    │   └── SourcePreview.svelte
+    └── schedule/         # 녹화 일정 페이지
 ```
 
-## Building
+## API 연결
 
-To create a production version of your app:
+백엔드 API 기본 경로는 `src/lib/api/config.ts`의 `API_URL`로 관리합니다 (기본값: `/api/v1`).
 
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+SvelteKit 개발 서버는 `vite.config.ts`의 프록시 설정을 통해 API 요청을 백엔드로 전달합니다.
