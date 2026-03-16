@@ -1,17 +1,5 @@
 import { API_URL } from './config';
 
-export type StreamInfo = {
-  m3u8_url: string | null;
-  title: string | null;
-  thumbnail: string | null;
-};
-
-export async function getStreamInfo(url: string): Promise<StreamInfo> {
-  const res = await fetch(`${API_URL}/stream-info?url=${encodeURIComponent(url)}`);
-  if (!res.ok) return { m3u8_url: null, title: null, thumbnail: null };
-  return res.json();
-}
-
 export async function parseM3u8(m3u8Url: string): Promise<string[]> {
   const proxyUrl = `${API_URL}/proxy?url=${encodeURIComponent(m3u8Url)}`;
   const res = await fetch(proxyUrl);

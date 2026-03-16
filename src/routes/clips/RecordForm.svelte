@@ -1,7 +1,8 @@
 <script lang="ts">
   import { FFmpeg } from '@ffmpeg/ffmpeg';
   import { toBlobURL } from '@ffmpeg/util';
-  import { getStreamInfo, parseM3u8 } from '$lib/api/stream';
+  import { fetchClipInfo } from '$lib/api/clips';
+  import { parseM3u8 } from '$lib/api/stream';
   import { API_URL } from '$lib/api/config';
 
   type Props = {
@@ -33,7 +34,7 @@
     if (fileNameEdited) return;
     titleLoading = true;
     const t = setTimeout(async () => {
-      const info = await getStreamInfo(targetUrl);
+      const info = await fetchClipInfo(targetUrl);
       if (info.title && !fileNameEdited) recFileName = info.title;
       titleLoading = false;
     }, 600);
@@ -74,7 +75,7 @@
     segCount = 0;
 
     try {
-      const info = await getStreamInfo(url);
+      const info = await fetchClipInfo(url);
       if (!info.m3u8_url) throw new Error('스트림 URL을 찾을 수 없습니다');
       m3u8Url = info.m3u8_url;
       status = 'recording';
