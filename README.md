@@ -59,3 +59,5 @@ src/
 백엔드 API 기본 경로는 `src/lib/api/config.ts`의 `API_URL`로 관리합니다 (기본값: `/api/v1`).
 
 SvelteKit 개발 서버는 `vite.config.ts`의 프록시 설정을 통해 API 요청을 백엔드로 전달합니다.
+
+참고: ffmpeg-core.wasm이 32MB라 .gitignore에 추가하고 빌드 스크립트로 복사하는 방식 고려할 것.
