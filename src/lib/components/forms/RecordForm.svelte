@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { SvelteSet } from 'svelte/reactivity';
   import { loadFfmpeg } from '$lib/ffmpeg';
   import { fetchClipInfo } from '$lib/api/clips';
   import { parseM3u8 } from '$lib/utils/stream';
@@ -24,7 +25,7 @@
   let m3u8Url = '';
   let initData: Uint8Array | null = null;
   let segments: Uint8Array[] = [];
-  let segmentsSeen = new Set<string>();
+  let segmentsSeen = new SvelteSet<string>();
   let pollTimerId: ReturnType<typeof setTimeout> | null = null;
   let isFirstPoll = true;
 
@@ -82,7 +83,7 @@
     err = '';
     initData = null;
     segments = [];
-    segmentsSeen = new Set();
+    segmentsSeen = new SvelteSet();
     segCount = 0;
     isFirstPoll = true;
 
@@ -160,7 +161,7 @@
     if (pollTimerId) { clearTimeout(pollTimerId); pollTimerId = null; }
     initData = null;
     segments = [];
-    segmentsSeen = new Set();
+    segmentsSeen = new SvelteSet();
     segCount = 0;
     isFirstPoll = true;
     status = 'idle';
