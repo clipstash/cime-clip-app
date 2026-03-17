@@ -56,11 +56,9 @@
   </div>
 </section>
 
+{#if clipListStore.clips.length > 0 || clipListStore.videos.length > 0 || clipListStore.records.length > 0}
 <section class="clips-section">
   <h2>목록</h2>
-  {#if clipListStore.clips.length === 0 && clipListStore.videos.length === 0 && clipListStore.records.length === 0}
-    <p class="empty">아직 항목이 없어요. URL을 입력해 시작해보세요!</p>
-  {:else}
     <div class="clips-grid">
       {#each clipListStore.clips as clip (clip.id)}
         <ClipCard {clip} onRemove={(id) => clipListStore.removeClip(id)} onPreview={(u) => clipListStore.openModal(u)} />
@@ -83,8 +81,8 @@
         />
       {/each}
     </div>
-  {/if}
 </section>
+{/if}
 
 {#if clipListStore.showModal}
   <PreviewModal url={clipListStore.modalUrl} onClose={() => clipListStore.closeModal()} />
