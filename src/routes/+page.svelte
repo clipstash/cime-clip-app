@@ -5,6 +5,7 @@
   import Nav from '$lib/components/Nav.svelte';
 </script>
 
+
 <Background />
 <Nav />
 
@@ -29,17 +30,5 @@
       <a href={resolve('/clips')} class="feature-btn">바로 가기 →</a>
     </div>
 
-    <div class="feature-card">
-      <div class="feature-icon">🕐</div>
-      <h3>녹화 예약</h3>
-      <p class="feature-desc">원하는 시각에 자동으로 녹화를 시작합니다. 미리 예약해두세요.</p>
-      <ol class="manual-steps">
-        <li>스트림 URL 입력</li>
-        <li>파일명 입력</li>
-        <li>예약 시각 설정</li>
-        <li>녹화 시간 설정 (선택)</li>
-      </ol>
-      <a href={resolve('/schedule')} class="feature-btn">예약하기 →</a>
-    </div>
   </div>
 </section>

@@ -1,3 +1,5 @@
 export function localUrl(u?: string | null): string {
-  return u ? u.replace(/^https?:\/\/localhost:\d+/, '') : '';
+  if (!u) return '';
+  if (u.startsWith('blob:')) return u;
+  return u.replace(/^https?:\/\/localhost:\d+/, '');
 }

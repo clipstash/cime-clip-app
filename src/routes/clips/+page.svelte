@@ -60,12 +60,20 @@
   function closeModal() { showModal = false; modalUrl = ''; }
 
   // ── 삭제 ──
-  function removeClip(id: string) { clips = clips.filter((c) => c.id !== id); }
+  function removeClip(id: string) {
+    const clip = clips.find((c) => c.id === id);
+    if (clip?.file_url?.startsWith('blob:')) URL.revokeObjectURL(clip.file_url);
+    clips = clips.filter((c) => c.id !== id);
+  }
   function removeVideo(id: string) { videos = videos.filter((v) => v.id !== id); }
-  function handleRemove(filename: string) { records = records.filter((r) => r.filename !== filename); }
+  function handleRemove(filename: string) {
+    const rec = records.find((r) => r.filename === filename);
+    if (rec?.file_url?.startsWith('blob:')) URL.revokeObjectURL(rec.file_url);
+    records = records.filter((r) => r.filename !== filename);
+  }
 
   // ── 브라우저 다운로드 완료 핸들러 ──
-  function handleClipSuccess(info: { title: string | null; startSec: number; endSec: number }) {
+  function handleClipSuccess(info: { title: string | null; startSec: number; endSec: number; blobUrl: string }) {
     const clip: Clip = {
       id: crypto.randomUUID(),
       platform: 'browser',
@@ -73,6 +81,7 @@
       title: info.title ?? undefined,
       start_time: info.startSec,
       end_time: info.endSec,
+      file_url: info.blobUrl,
     };
     clips = [clip, ...clips];
   }
@@ -87,13 +96,13 @@
     videos = [video, ...videos];
   }
 
-  function handleRecordSuccess(info: { filename: string; url: string }) {
+  function handleRecordSuccess(info: { filename: string; url: string; blobUrl: string }) {
     const record: ActiveRecord = {
       id: crypto.randomUUID(),
       filename: info.filename,
       url: info.url,
       status: 'completed',
-      file_url: null,
+      file_url: info.blobUrl,
       error_message: null,
       started_at: null,
     };
