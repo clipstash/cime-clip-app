@@ -1,45 +1,92 @@
 <script lang="ts">
-  import { resolve } from '$app/paths';
   import '../styles/page.css';
+  import { sourceStore } from '$lib/stores/sourceStore.svelte';
+  import { clipListStore } from '$lib/stores/clipListStore.svelte';
   import Background from '$lib/components/Background.svelte';
   import Nav from '$lib/components/Nav.svelte';
+  import ClipCard from '$lib/components/cards/ClipCard.svelte';
+  import VideoCard from '$lib/components/cards/VideoCard.svelte';
+  import RecordCard from '$lib/components/cards/RecordCard.svelte';
+  import PreviewModal from '$lib/components/PreviewModal.svelte';
+  import SourcePreview from '$lib/components/SourcePreview.svelte';
+  import ClipForm from '$lib/components/forms/ClipForm.svelte';
+  import VideoForm from '$lib/components/forms/VideoForm.svelte';
+  import RecordForm from '$lib/components/forms/RecordForm.svelte';
 </script>
 
 <Background />
-<Nav />
+<Nav active="clips" />
 
 <section class="hero">
-  <p class="label">cime clip app</p>
+  <p class="label">cime clip & video & recorder</p>
   <h1>Download.<br/>Clip. Share.</h1>
-  <p class="desc">씨미 라이브를 가장 쉽게 저장하는 방법.<br/>클립 다운로드부터 실시간 녹화까지.</p>
-</section>
+  <p class="desc">씨미 라이브를 클립하거나 전체 다운로드,<br/>또는 실시간으로 녹화하세요.</p>
 
-<section class="feature-section">
-  <div class="feature-grid">
-    <div class="feature-card">
-      <div class="feature-icon">✂️</div>
-      <h3>클립 · 녹화 · 다운로드</h3>
-      <p class="feature-desc">구간 클립 생성, 실시간 녹화, 풀 영상 다운로드를 한 곳에서.</p>
-      <ol class="manual-steps">
-        <li>방송 URL 입력</li>
-        <li>원하는 작업 탭 선택</li>
-        <li>옵션 설정 후 실행</li>
-        <li>완료 후 다운로드</li>
-      </ol>
-      <a href={resolve('/clips')} class="feature-btn">바로 가기 →</a>
+  <div class="form-card">
+    <div class="form-row">
+      <input type="text" placeholder="URL을 입력하세요" bind:value={sourceStore.url} />
     </div>
 
-    <div class="feature-card">
-      <div class="feature-icon">🕐</div>
-      <h3>녹화 예약</h3>
-      <p class="feature-desc">원하는 시각에 자동으로 녹화를 시작합니다. 미리 예약해두세요.</p>
-      <ol class="manual-steps">
-        <li>스트림 URL 입력</li>
-        <li>파일명 입력</li>
-        <li>예약 시각 설정</li>
-        <li>녹화 시간 설정 (선택)</li>
-      </ol>
-      <a href={resolve('/schedule')} class="feature-btn">예약하기 →</a>
-    </div>
+    {#if sourceStore.url}
+      <SourcePreview
+        url={sourceStore.url}
+        sourceLoading={sourceStore.loading}
+        sourceThumbnail={sourceStore.thumbnail}
+        sourceTitle={sourceStore.title}
+        sourceIsLive={sourceStore.isLive}
+        durationLoaded={sourceStore.durationLoaded}
+        totalSec={sourceStore.totalSec}
+      />
+    {/if}
+
+    <div class="action-divider"></div>
+    <ClipForm url={sourceStore.url} totalSec={sourceStore.totalSec} durationLoaded={sourceStore.durationLoaded} onSuccess={(info) => clipListStore.addClip(info)} />
+
+    <div class="action-divider"></div>
+    <VideoForm url={sourceStore.url} onSuccess={(info) => clipListStore.addVideo(info)} />
+
+    <div class="action-divider"></div>
+    <RecordForm url={sourceStore.url} onSuccess={(info) => clipListStore.addRecord(info)} />
   </div>
 </section>
+
+<section class="clips-section">
+  <h2>목록</h2>
+  {#if clipListStore.clips.length === 0 && clipListStore.videos.length === 0 && clipListStore.records.length === 0}
+    <p class="empty">아직 항목이 없어요. URL을 입력해 시작해보세요!</p>
+  {:else}
+    <div class="clips-grid">
+      {#each clipListStore.clips as clip (clip.id)}
+        <ClipCard {clip} onRemove={(id) => clipListStore.removeClip(id)} onPreview={(u) => clipListStore.openModal(u)} />
+      {/each}
+
+      {#each clipListStore.videos as video (video.id)}
+        <VideoCard {video} onRemove={(id) => clipListStore.removeVideo(id)} onPreview={(u) => clipListStore.openModal(u)} />
+      {/each}
+
+      {#each clipListStore.records as record (record.filename)}
+        <RecordCard
+          {record}
+          isPaused={false}
+          onPause={() => {}}
+          onResume={() => {}}
+          onStop={() => {}}
+          onCancel={() => {}}
+          onRemove={(f) => clipListStore.removeRecord(f)}
+          onPreview={(u) => clipListStore.openModal(u)}
+        />
+      {/each}
+    </div>
+  {/if}
+</section>
+
+{#if clipListStore.showModal}
+  <PreviewModal url={clipListStore.modalUrl} onClose={() => clipListStore.closeModal()} />
+{/if}
+
+<style>
+  .action-divider {
+    border-top: 1px solid #141414;
+    margin: 0;
+  }
+</style>

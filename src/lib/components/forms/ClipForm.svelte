@@ -1,11 +1,15 @@
 <script lang="ts">
-  import { createClip } from '$lib/api/clips';
+  import { fetchFile } from '@ffmpeg/util';
+  import { loadFfmpeg } from '$lib/ffmpeg';
+  import { fetchClipInfo } from '$lib/api/clips';
+  import { parseM3u8 } from '$lib/utils/stream';
+  import { API_URL } from '$lib/api/config';
 
   type Props = {
     url: string;
     totalSec: number;
     durationLoaded: boolean;
-    onSuccess: (info: { title: string | null; startSec: number; endSec: number }) => void;
+    onSuccess: (info: { title: string | null; startSec: number; endSec: number, blobUrl: string  }) => void;
     onVideoSuccess: (info: { title: string | null; url: string }) => void;
   };
 
@@ -16,10 +20,14 @@
   let focusedField = $state<string | null>(null);
   let trackEl = $state<HTMLDivElement | null>(null);
   let dragging = $state<'start' | 'end' | null>(null);
-  let loading = $state(false);
   let err = $state('');
 
-  const startSec     = $derived(startH * 3600 + startM * 60 + startS);
+  type DlStatus = 'idle' | 'loading' | 'downloading' | 'encoding' | 'done' | 'error';
+  let dlStatus = $state<DlStatus>('idle');
+  let progress = $state(0);
+  let progressLabel = $state('');
+
+const startSec     = $derived(startH * 3600 + startM * 60 + startS);
   const endSec       = $derived(endH   * 3600 + endM   * 60 + endS);
   const clipDuration = $derived(Math.max(0, endSec - startSec));
   const startPct     = $derived(totalSec > 0 ? Math.min(100, (startSec / totalSec) * 100) : 0);
@@ -89,13 +97,81 @@
   }
 
   async function submit() {
-    if (!url) return;
-    loading = true; err = '';
+    if (!url || dlStatus !== 'idle' || !!timeError) return;
+    dlStatus = 'loading';
+    err = '';
+    progress = 0;
+
     try {
-      await createClip(url, startSec, endSec);
-      onSuccess();
-    } catch (e) { err = e instanceof Error ? e.message : String(e); }
-    finally { loading = false; }
+      const info = await fetchClipInfo(url);
+      if (!info.m3u8_url) throw new Error('스트림 URL을 찾을 수 없습니다');
+
+      const { initUrl, segments } = await parseM3u8(info.m3u8_url);
+      if (segments.length === 0) throw new Error('세그먼트를 찾을 수 없습니다');
+
+      const ffmpeg = await loadFfmpeg();
+
+      dlStatus = 'downloading';
+      const segNames: string[] = [];
+
+      // fMP4 streams require an init segment prepended to each segment
+      let initData: Uint8Array | null = null;
+      if (initUrl) {
+        const proxyInit = `${API_URL}/proxy?url=${encodeURIComponent(initUrl)}`;
+        initData = await fetchFile(proxyInit);
+      }
+
+      for (let i = 0; i < segments.length; i++) {
+        const segUrl = `${API_URL}/proxy?url=${encodeURIComponent(segments[i])}`;
+        const segData = await fetchFile(segUrl);
+        const name = `seg${String(i).padStart(5, '0')}.mp4`;
+        if (initData) {
+          const combined = new Uint8Array(initData.byteLength + segData.byteLength);
+          combined.set(initData, 0);
+          combined.set(segData, initData.byteLength);
+          await ffmpeg.writeFile(name, combined);
+        } else {
+          await ffmpeg.writeFile(name, segData);
+        }
+        segNames.push(name);
+        progress = Math.round(((i + 1) / segments.length) * 80);
+        progressLabel = `${i + 1} / ${segments.length} 세그먼트`;
+      }
+
+      dlStatus = 'encoding';
+      progressLabel = 'MP4 변환 중...';
+      progress = 82;
+
+      const concatList = segNames.map((n) => `file '${n}'`).join('\n');
+      await ffmpeg.writeFile('concat.txt', concatList);
+      await ffmpeg.exec(['-ss', String(startSec), '-f', 'concat', '-safe', '0', '-i', 'concat.txt', '-t', String(endSec - startSec), '-c', 'copy', 'output.mp4']);
+      progress = 96;
+
+      const raw = (await ffmpeg.readFile('output.mp4')) as Uint8Array;
+      const buf = new ArrayBuffer(raw.byteLength);
+      new Uint8Array(buf).set(raw);
+      const blob = new Blob([buf], { type: 'video/mp4' });
+      const objUrl = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      const safe = (info.title ?? 'clip').replace(/[\\/:*?"<>|]/g, '_');
+      a.href = objUrl;
+      a.download = `${safe}.mp4`;
+      a.click();
+
+      for (const name of segNames) await ffmpeg.deleteFile(name);
+      await ffmpeg.deleteFile('concat.txt');
+      await ffmpeg.deleteFile('output.mp4');
+
+      progress = 100;
+      progressLabel = '완료!';
+      dlStatus = 'done';
+      onSuccess({ title: info.title, startSec, endSec, blobUrl: objUrl });
+      setTimeout(() => { dlStatus = 'idle'; progress = 0; progressLabel = ''; }, 3000);
+    } catch (e) {
+      err = e instanceof Error ? e.message : String(e);
+      dlStatus = 'error';
+    }
   }
 
   const busy = $derived(dlStatus === 'loading' || dlStatus === 'downloading' || dlStatus === 'encoding');
@@ -226,8 +302,8 @@
       </div>
     </div>
   </div>
-  <button class="submit-btn" onclick={submit} disabled={loading || !url || !!timeError}>
-    {loading ? '처리중...' : '클립 생성 ✦'}
+  <button class="submit-btn" onclick={submit} disabled={busy || !url || !!timeError}>
+    {dlStatus === 'done' ? '완료 ✓' : busy ? '처리중...' : '클립 생성 ✦'}
   </button>
   <button class="submit-btn" onclick={videoSubmit} disabled={videoBusy || !url}>
     {videoDlStatus === 'done' ? '완료 ✓' : videoBusy ? '처리중...' : '전체 다운로드 ✦'}

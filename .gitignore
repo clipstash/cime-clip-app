@@ -37,6 +37,9 @@ Thumbs.db
 # Logs
 *.log
 
+# FFmpeg wasm (복사본 — npm run postinstall로 생성)
+static/ffmpeg/
+
 # Claude Code
 .claude/
 CLAUDE.md
