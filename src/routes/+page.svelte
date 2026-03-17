@@ -87,10 +87,3 @@
 {#if clipListStore.showModal}
   <PreviewModal url={clipListStore.modalUrl} onClose={() => clipListStore.closeModal()} />
 {/if}
-
-<style>
-  .action-divider {
-    border-top: 1px solid #141414;
-    margin: 0;
-  }
-</style>
