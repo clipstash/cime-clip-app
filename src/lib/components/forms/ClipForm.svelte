@@ -33,6 +33,9 @@
   let dragging = $state<'start' | 'end' | null>(null);
   let err = $state('');
 
+  let cancelClipRequested = $state(false);
+  let cancelVideoRequested = $state(false);
+
   type DlStatus = 'idle' | 'loading' | 'downloading' | 'encoding' | 'done' | 'error';
   let dlStatus = $state<DlStatus>('idle');
   let progress = $state(0);
@@ -111,6 +114,7 @@ const startSec     = $derived(startH * 3600 + startM * 60 + startS);
 
   async function submit() {
     if (!url || dlStatus !== 'idle' || !!timeError) return;
+    cancelClipRequested = false;
     dlStatus = 'loading';
     err = '';
     progress = 0;
@@ -147,11 +151,13 @@ const startSec     = $derived(startH * 3600 + startM * 60 + startS);
       // 선택된 세그먼트만 다운로드
       const segParts: Uint8Array[] = [];
       for (let idx = 0; idx < selectedIdxs.length; idx++) {
+        if (cancelClipRequested) { dlStatus = 'idle'; progress = 0; progressLabel = ''; return; }
         const segUrl = `${API_URL}/stream/proxy?url=${encodeURIComponent(segments[selectedIdxs[idx]])}`;
         segParts.push(await fetchFile(segUrl));
         progress = Math.round(((idx + 1) / selectedIdxs.length) * 80);
         progressLabel = `${idx + 1} / ${selectedIdxs.length} 세그먼트`;
       }
+      if (cancelClipRequested) { dlStatus = 'idle'; progress = 0; progressLabel = ''; return; }
 
       // init(1회) + 세그먼트들을 단일 바이너리로 합산
       const parts: Uint8Array[] = initData ? [initData, ...segParts] : segParts;
@@ -214,6 +220,7 @@ const startSec     = $derived(startH * 3600 + startM * 60 + startS);
 
   async function videoSubmit() {
     if (!url || videoDlStatus !== 'idle') return;
+    cancelVideoRequested = false;
     videoDlStatus = 'loading';
     videoProgress = 0;
 
@@ -236,6 +243,7 @@ const startSec     = $derived(startH * 3600 + startM * 60 + startS);
       }
 
       for (let i = 0; i < segments.length; i++) {
+        if (cancelVideoRequested) { videoDlStatus = 'idle'; videoProgress = 0; videoProgressLabel = ''; return; }
         const segUrl = `${API_URL}/stream/proxy?url=${encodeURIComponent(segments[i])}`;
         const segData = await fetchFile(segUrl);
         const name = `vseg${String(i).padStart(5, '0')}.mp4`;
@@ -251,6 +259,7 @@ const startSec     = $derived(startH * 3600 + startM * 60 + startS);
         videoProgress = Math.round(((i + 1) / segments.length) * 80);
         videoProgressLabel = `${i + 1} / ${segments.length} 세그먼트`;
       }
+      if (cancelVideoRequested) { videoDlStatus = 'idle'; videoProgress = 0; videoProgressLabel = ''; return; }
 
       videoDlStatus = 'encoding';
       videoProgressLabel = 'MP4 변환 중...';
@@ -351,17 +360,19 @@ const startSec     = $derived(startH * 3600 + startM * 60 + startS);
   </div>
   {#if dlStatus === 'done'}
     <button class="submit-btn" onclick={triggerDownload}>다운로드 ↓</button>
+  {:else if busy}
+    <button class="submit-btn" disabled>처리중...</button>
+    <button class="cancel-btn" onclick={() => (cancelClipRequested = true)}>취소 ✕</button>
   {:else}
-    <button class="submit-btn" onclick={submit} disabled={busy || !url || !!timeError}>
-      {busy ? '처리중...' : '클립 생성 ✦'}
-    </button>
+    <button class="submit-btn" onclick={submit} disabled={!url || !!timeError}>클립 생성 ✦</button>
   {/if}
   {#if videoDlStatus === 'done'}
     <button class="submit-btn" onclick={triggerVideoDownload}>다운로드 ↓</button>
+  {:else if videoBusy}
+    <button class="submit-btn" disabled>처리중...</button>
+    <button class="cancel-btn" onclick={() => (cancelVideoRequested = true)}>취소 ✕</button>
   {:else}
-    <button class="submit-btn" onclick={videoSubmit} disabled={videoBusy || !url}>
-      {videoBusy ? '처리중...' : '전체 다운로드 ✦'}
-    </button>
+    <button class="submit-btn" onclick={videoSubmit} disabled={!url}>전체 다운로드 ✦</button>
   {/if}
 </div>
 
