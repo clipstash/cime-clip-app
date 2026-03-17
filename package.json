@@ -4,8 +4,8 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"dev": "vite dev",
-		"build": "vite build",
+		"dev": "node scripts/copy-ffmpeg.js && vite dev",
+		"build": "node scripts/copy-ffmpeg.js && vite build",
 		"preview": "vite preview",
 		"postinstall": "node scripts/copy-ffmpeg.js",
 		"prepare": "svelte-kit sync || echo ''",

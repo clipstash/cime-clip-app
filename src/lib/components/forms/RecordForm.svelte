@@ -14,6 +14,7 @@
   type RecordStatus = 'idle' | 'loading' | 'recording' | 'paused' | 'encoding' | 'done' | 'error';
 
   let recFileName = $state('');
+  let recBlobUrl = $state('');
   let status = $state<RecordStatus>('idle');
   let err = $state('');
   let segCount = $state(0);
@@ -25,6 +26,7 @@
   let segments: Uint8Array[] = [];
   let segmentsSeen = new Set<string>();
   let pollTimerId: ReturnType<typeof setTimeout> | null = null;
+  let isFirstPoll = true;
 
 
   $effect(() => {
@@ -54,12 +56,18 @@
       if (initUrl && !initData) {
         initData = await fetchSegment(initUrl);
       }
-      for (const seg of newSegs) {
-        if (!segmentsSeen.has(seg)) {
-          segmentsSeen.add(seg);
-          const data = await fetchSegment(seg);
-          segments.push(data);
-          segCount = segments.length;
+      if (isFirstPoll) {
+        // 첫 폴링: 기존 세그먼트는 seen 처리만 하고 다운로드하지 않음
+        for (const seg of newSegs) segmentsSeen.add(seg);
+        isFirstPoll = false;
+      } else {
+        for (const seg of newSegs) {
+          if (!segmentsSeen.has(seg)) {
+            segmentsSeen.add(seg);
+            const data = await fetchSegment(seg);
+            segments.push(data);
+            segCount = segments.length;
+          }
         }
       }
     } catch { /* 세그먼트 fetch 실패는 무시 */ }
@@ -76,6 +84,7 @@
     segments = [];
     segmentsSeen = new Set();
     segCount = 0;
+    isFirstPoll = true;
 
     try {
       const info = await fetchClipInfo(url);
@@ -134,19 +143,13 @@
       const blob = new Blob([buf], { type: 'video/mp4' });
       const objUrl = URL.createObjectURL(blob);
 
-      const a = document.createElement('a');
-      const safe = recFileName.replace(/[\\/:*?"<>|]/g, '_');
-      a.href = objUrl;
-      a.download = `${safe}.mp4`;
-      a.click();
-
       for (const name of segNames) await ffmpeg.deleteFile(name);
       await ffmpeg.deleteFile('concat.txt');
       await ffmpeg.deleteFile('output.mp4');
 
+      recBlobUrl = objUrl;
       status = 'done';
       onSuccess?.({ filename: recFileName, url, blobUrl: objUrl });
-      setTimeout(() => { reset(); }, 3000);
     } catch (e) {
       err = e instanceof Error ? e.message : String(e);
       status = 'error';
@@ -159,8 +162,19 @@
     segments = [];
     segmentsSeen = new Set();
     segCount = 0;
+    isFirstPoll = true;
     status = 'idle';
     err = '';
+  }
+
+  function triggerRecDownload() {
+    const a = document.createElement('a');
+    a.href = recBlobUrl;
+    a.download = `${recFileName.replace(/[\\/:*?"<>|]/g, '_')}.mp4`;
+    a.click();
+    URL.revokeObjectURL(recBlobUrl);
+    recBlobUrl = '';
+    reset();
   }
 
   const isActive = $derived(status === 'recording' || status === 'paused');
@@ -193,7 +207,7 @@
   {:else if status === 'encoding'}
     <span class="rec-info">MP4 변환 중... ({segCount} 세그먼트)</span>
   {:else if status === 'done'}
-    <button class="submit-btn" onclick={reset}>녹화 완료 ✓</button>
+    <button class="submit-btn" onclick={triggerRecDownload}>다운로드 ↓</button>
   {/if}
 </div>
 {#if err}<p class="error">{err}</p>{/if}

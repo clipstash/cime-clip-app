@@ -863,22 +863,28 @@ h2 {
 .rec-controls {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+  width: 100%;
 }
 .rec-info {
   font-size: 0.78rem;
   color: #666;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .rec-btn {
-  flex: 1;
+  flex-shrink: 0;
   border: none;
-  border-radius: 0.4rem;
-  padding: 0.4rem 0;
+  border-radius: 0.35rem;
+  padding: 0.42rem 0.85rem;
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.15s;
+  white-space: nowrap;
 }
 .rec-btn:hover { opacity: 0.8; }
 .rec-btn-pause  { background: #2a2a2a; color: #facc15; border: 1px solid #3a3a1a; }

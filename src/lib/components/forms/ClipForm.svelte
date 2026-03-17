@@ -16,7 +16,18 @@
   const { url, totalSec, durationLoaded, onSuccess, onVideoSuccess }: Props = $props();
 
   let startH = $state(0), startM = $state(0), startS = $state(0);
-  let endH   = $state(0), endM   = $state(0), endS   = $state(30);
+  let endH   = $state(0), endM   = $state(0), endS   = $state(0);
+
+  $effect(() => {
+    void url;
+    startH = 0; startM = 0; startS = 0;
+    endH = 0; endM = 0; endS = 0;
+  });
+
+  $effect(() => {
+    if (!durationLoaded || totalSec <= 0) return;
+    setFromSec('end', totalSec);
+  });
   let focusedField = $state<string | null>(null);
   let trackEl = $state<HTMLDivElement | null>(null);
   let dragging = $state<'start' | 'end' | null>(null);
@@ -26,6 +37,8 @@
   let dlStatus = $state<DlStatus>('idle');
   let progress = $state(0);
   let progressLabel = $state('');
+  let dlBlobUrl = $state('');
+  let dlFileName = $state('');
 
 const startSec     = $derived(startH * 3600 + startM * 60 + startS);
   const endSec       = $derived(endH   * 3600 + endM   * 60 + endS);
@@ -106,45 +119,54 @@ const startSec     = $derived(startH * 3600 + startM * 60 + startS);
       const info = await fetchClipInfo(url);
       if (!info.m3u8_url) throw new Error('스트림 URL을 찾을 수 없습니다');
 
-      const { initUrl, segments } = await parseM3u8(info.m3u8_url);
+      const { initUrl, segments, durations } = await parseM3u8(info.m3u8_url);
       if (segments.length === 0) throw new Error('세그먼트를 찾을 수 없습니다');
 
+      // 시간 입력을 현재 윈도우 기준(0-indexed)으로 취급하여 세그먼트 선택
+      let cumTime = 0;
+      const selectedIdxs: number[] = [];
+      for (let i = 0; i < segments.length; i++) {
+        const segDur = durations[i] || 2;
+        if (cumTime + segDur > startSec && cumTime < endSec) {
+          selectedIdxs.push(i);
+        }
+        cumTime += segDur;
+      }
+      if (selectedIdxs.length === 0) throw new Error('지정한 구간이 현재 스트림 범위를 벗어납니다');
+
       const ffmpeg = await loadFfmpeg();
-
       dlStatus = 'downloading';
-      const segNames: string[] = [];
 
-      // fMP4 streams require an init segment prepended to each segment
+      // init 세그먼트 다운로드
       let initData: Uint8Array | null = null;
       if (initUrl) {
         const proxyInit = `${API_URL}/proxy?url=${encodeURIComponent(initUrl)}`;
         initData = await fetchFile(proxyInit);
       }
 
-      for (let i = 0; i < segments.length; i++) {
-        const segUrl = `${API_URL}/proxy?url=${encodeURIComponent(segments[i])}`;
-        const segData = await fetchFile(segUrl);
-        const name = `seg${String(i).padStart(5, '0')}.mp4`;
-        if (initData) {
-          const combined = new Uint8Array(initData.byteLength + segData.byteLength);
-          combined.set(initData, 0);
-          combined.set(segData, initData.byteLength);
-          await ffmpeg.writeFile(name, combined);
-        } else {
-          await ffmpeg.writeFile(name, segData);
-        }
-        segNames.push(name);
-        progress = Math.round(((i + 1) / segments.length) * 80);
-        progressLabel = `${i + 1} / ${segments.length} 세그먼트`;
+      // 선택된 세그먼트만 다운로드
+      const segParts: Uint8Array[] = [];
+      for (let idx = 0; idx < selectedIdxs.length; idx++) {
+        const segUrl = `${API_URL}/proxy?url=${encodeURIComponent(segments[selectedIdxs[idx]])}`;
+        segParts.push(await fetchFile(segUrl));
+        progress = Math.round(((idx + 1) / selectedIdxs.length) * 80);
+        progressLabel = `${idx + 1} / ${selectedIdxs.length} 세그먼트`;
       }
+
+      // init(1회) + 세그먼트들을 단일 바이너리로 합산
+      const parts: Uint8Array[] = initData ? [initData, ...segParts] : segParts;
+      const totalBytes = parts.reduce((a, p) => a + p.byteLength, 0);
+      const combined = new Uint8Array(totalBytes);
+      let byteOffset = 0;
+      for (const part of parts) { combined.set(part, byteOffset); byteOffset += part.byteLength; }
+      await ffmpeg.writeFile('input.mp4', combined);
 
       dlStatus = 'encoding';
       progressLabel = 'MP4 변환 중...';
       progress = 82;
 
-      const concatList = segNames.map((n) => `file '${n}'`).join('\n');
-      await ffmpeg.writeFile('concat.txt', concatList);
-      await ffmpeg.exec(['-ss', String(startSec), '-f', 'concat', '-safe', '0', '-i', 'concat.txt', '-t', String(endSec - startSec), '-c', 'copy', 'output.mp4']);
+      // 단일 파일로 정확한 타임스탬프 시크
+      await ffmpeg.exec(['-ss', String(startSec), '-i', 'input.mp4', '-t', String(endSec - startSec), '-c', 'copy', 'output.mp4']);
       progress = 96;
 
       const raw = (await ffmpeg.readFile('output.mp4')) as Uint8Array;
@@ -153,25 +175,32 @@ const startSec     = $derived(startH * 3600 + startM * 60 + startS);
       const blob = new Blob([buf], { type: 'video/mp4' });
       const objUrl = URL.createObjectURL(blob);
 
-      const a = document.createElement('a');
-      const safe = (info.title ?? 'clip').replace(/[\\/:*?"<>|]/g, '_');
-      a.href = objUrl;
-      a.download = `${safe}.mp4`;
-      a.click();
-
-      for (const name of segNames) await ffmpeg.deleteFile(name);
-      await ffmpeg.deleteFile('concat.txt');
+      await ffmpeg.deleteFile('input.mp4');
       await ffmpeg.deleteFile('output.mp4');
 
       progress = 100;
       progressLabel = '완료!';
+      dlBlobUrl = objUrl;
+      dlFileName = `${(info.title ?? 'clip').replace(/[\\/:*?"<>|]/g, '_')}.mp4`;
       dlStatus = 'done';
       onSuccess({ title: info.title, startSec, endSec, blobUrl: objUrl });
-      setTimeout(() => { dlStatus = 'idle'; progress = 0; progressLabel = ''; }, 3000);
     } catch (e) {
       err = e instanceof Error ? e.message : String(e);
       dlStatus = 'error';
     }
+  }
+
+  function triggerDownload() {
+    const a = document.createElement('a');
+    a.href = dlBlobUrl;
+    a.download = dlFileName;
+    a.click();
+    URL.revokeObjectURL(dlBlobUrl);
+    dlBlobUrl = '';
+    dlFileName = '';
+    dlStatus = 'idle';
+    progress = 0;
+    progressLabel = '';
   }
 
   const busy = $derived(dlStatus === 'loading' || dlStatus === 'downloading' || dlStatus === 'encoding');
@@ -180,6 +209,8 @@ const startSec     = $derived(startH * 3600 + startM * 60 + startS);
   let videoDlStatus = $state<DlStatus>('idle');
   let videoProgress = $state(0);
   let videoProgressLabel = $state('');
+  let videoDlBlobUrl = $state('');
+  let videoDlFileName = $state('');
 
   async function videoSubmit() {
     if (!url || videoDlStatus !== 'idle') return;
@@ -190,23 +221,32 @@ const startSec     = $derived(startH * 3600 + startM * 60 + startS);
       const info = await fetchClipInfo(url);
       if (!info.m3u8_url) throw new Error('스트림 URL을 찾을 수 없습니다');
 
-      const segments = await parseM3u8(info.m3u8_url);
+      const { initUrl: vInitUrl, segments } = await parseM3u8(info.m3u8_url);
       if (segments.length === 0) throw new Error('세그먼트를 찾을 수 없습니다');
 
-      const ffmpeg = new FFmpeg();
-      await ffmpeg.load({
-        coreURL: await toBlobURL(`${FFMPEG_CORE_URL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${FFMPEG_CORE_URL}/ffmpeg-core.wasm`, 'application/wasm')
-      });
+      const ffmpeg = await loadFfmpeg();
 
       videoDlStatus = 'downloading';
       const segNames: string[] = [];
 
+      let vInitData: Uint8Array | null = null;
+      if (vInitUrl) {
+        const proxyInit = `${API_URL}/proxy?url=${encodeURIComponent(vInitUrl)}`;
+        vInitData = await fetchFile(proxyInit);
+      }
+
       for (let i = 0; i < segments.length; i++) {
         const segUrl = `${API_URL}/proxy?url=${encodeURIComponent(segments[i])}`;
-        const data = await fetchFile(segUrl);
-        const name = `seg${String(i).padStart(5, '0')}.ts`;
-        await ffmpeg.writeFile(name, data);
+        const segData = await fetchFile(segUrl);
+        const name = `vseg${String(i).padStart(5, '0')}.mp4`;
+        if (vInitData) {
+          const combined = new Uint8Array(vInitData.byteLength + segData.byteLength);
+          combined.set(vInitData, 0);
+          combined.set(segData, vInitData.byteLength);
+          await ffmpeg.writeFile(name, combined);
+        } else {
+          await ffmpeg.writeFile(name, segData);
+        }
         segNames.push(name);
         videoProgress = Math.round(((i + 1) / segments.length) * 80);
         videoProgressLabel = `${i + 1} / ${segments.length} 세그먼트`;
@@ -217,36 +257,43 @@ const startSec     = $derived(startH * 3600 + startM * 60 + startS);
       videoProgress = 82;
 
       const concatList = segNames.map((n) => `file '${n}'`).join('\n');
-      await ffmpeg.writeFile('concat.txt', concatList);
-      await ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', 'concat.txt', '-c', 'copy', 'output.mp4']);
+      await ffmpeg.writeFile('vconcat.txt', concatList);
+      await ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', 'vconcat.txt', '-c', 'copy', 'voutput.mp4']);
       videoProgress = 96;
 
-      const raw = (await ffmpeg.readFile('output.mp4')) as Uint8Array;
+      const raw = (await ffmpeg.readFile('voutput.mp4')) as Uint8Array;
       const buf = new ArrayBuffer(raw.byteLength);
       new Uint8Array(buf).set(raw);
       const blob = new Blob([buf], { type: 'video/mp4' });
       const objUrl = URL.createObjectURL(blob);
 
-      const a = document.createElement('a');
-      const safe = (info.title ?? 'video').replace(/[\\/:*?"<>|]/g, '_');
-      a.href = objUrl;
-      a.download = `${safe}.mp4`;
-      a.click();
-      URL.revokeObjectURL(objUrl);
-
       for (const name of segNames) await ffmpeg.deleteFile(name);
-      await ffmpeg.deleteFile('concat.txt');
-      await ffmpeg.deleteFile('output.mp4');
+      await ffmpeg.deleteFile('vconcat.txt');
+      await ffmpeg.deleteFile('voutput.mp4');
 
       videoProgress = 100;
       videoProgressLabel = '완료!';
+      videoDlBlobUrl = objUrl;
+      videoDlFileName = `${(info.title ?? 'video').replace(/[\\/:*?"<>|]/g, '_')}.mp4`;
       videoDlStatus = 'done';
       onVideoSuccess({ title: info.title, url });
-      setTimeout(() => { videoDlStatus = 'idle'; videoProgress = 0; videoProgressLabel = ''; }, 3000);
     } catch (e) {
       err = e instanceof Error ? e.message : String(e);
       videoDlStatus = 'error';
     }
+  }
+
+  function triggerVideoDownload() {
+    const a = document.createElement('a');
+    a.href = videoDlBlobUrl;
+    a.download = videoDlFileName;
+    a.click();
+    URL.revokeObjectURL(videoDlBlobUrl);
+    videoDlBlobUrl = '';
+    videoDlFileName = '';
+    videoDlStatus = 'idle';
+    videoProgress = 0;
+    videoProgressLabel = '';
   }
 
   const videoBusy = $derived(videoDlStatus === 'loading' || videoDlStatus === 'downloading' || videoDlStatus === 'encoding');
@@ -302,12 +349,20 @@ const startSec     = $derived(startH * 3600 + startM * 60 + startS);
       </div>
     </div>
   </div>
-  <button class="submit-btn" onclick={submit} disabled={busy || !url || !!timeError}>
-    {dlStatus === 'done' ? '완료 ✓' : busy ? '처리중...' : '클립 생성 ✦'}
-  </button>
-  <button class="submit-btn" onclick={videoSubmit} disabled={videoBusy || !url}>
-    {videoDlStatus === 'done' ? '완료 ✓' : videoBusy ? '처리중...' : '전체 다운로드 ✦'}
-  </button>
+  {#if dlStatus === 'done'}
+    <button class="submit-btn" onclick={triggerDownload}>다운로드 ↓</button>
+  {:else}
+    <button class="submit-btn" onclick={submit} disabled={busy || !url || !!timeError}>
+      {busy ? '처리중...' : '클립 생성 ✦'}
+    </button>
+  {/if}
+  {#if videoDlStatus === 'done'}
+    <button class="submit-btn" onclick={triggerVideoDownload}>다운로드 ↓</button>
+  {:else}
+    <button class="submit-btn" onclick={videoSubmit} disabled={videoBusy || !url}>
+      {videoBusy ? '처리중...' : '전체 다운로드 ✦'}
+    </button>
+  {/if}
 </div>
 
 {#if busy}

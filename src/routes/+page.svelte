@@ -10,12 +10,11 @@
   import PreviewModal from '$lib/components/PreviewModal.svelte';
   import SourcePreview from '$lib/components/SourcePreview.svelte';
   import ClipForm from '$lib/components/forms/ClipForm.svelte';
-  import VideoForm from '$lib/components/forms/VideoForm.svelte';
   import RecordForm from '$lib/components/forms/RecordForm.svelte';
 </script>
 
 <Background />
-<Nav active="clips" />
+<Nav />
 
 <section class="hero">
   <p class="label">cime clip & video & recorder</p>
@@ -39,14 +38,21 @@
       />
     {/if}
 
-    <div class="action-divider"></div>
-    <ClipForm url={sourceStore.url} totalSec={sourceStore.totalSec} durationLoaded={sourceStore.durationLoaded} onSuccess={(info) => clipListStore.addClip(info)} />
+    {#if sourceStore.url && !sourceStore.loading && !sourceStore.isLive}
+      <div class="action-divider"></div>
+      <ClipForm
+        url={sourceStore.url}
+        totalSec={sourceStore.totalSec}
+        durationLoaded={sourceStore.durationLoaded}
+        onSuccess={(info) => clipListStore.addClip(info)}
+        onVideoSuccess={(info) => clipListStore.addVideo(info)}
+      />
+    {/if}
 
-    <div class="action-divider"></div>
-    <VideoForm url={sourceStore.url} onSuccess={(info) => clipListStore.addVideo(info)} />
-
-    <div class="action-divider"></div>
-    <RecordForm url={sourceStore.url} onSuccess={(info) => clipListStore.addRecord(info)} />
+    {#if sourceStore.url && !sourceStore.loading && sourceStore.isLive}
+      <div class="action-divider"></div>
+      <RecordForm url={sourceStore.url} onSuccess={(info) => clipListStore.addRecord(info)} />
+    {/if}
   </div>
 </section>
 
