@@ -7,7 +7,7 @@ export type M3u8Info = {
 };
 
 export async function parseM3u8(m3u8Url: string): Promise<M3u8Info> {
-  const proxyUrl = `${API_URL}/proxy?url=${encodeURIComponent(m3u8Url)}`;
+  const proxyUrl = `${API_URL}/stream/proxy?url=${encodeURIComponent(m3u8Url)}`;
   const res = await fetch(proxyUrl);
   if (!res.ok) return { initUrl: null, segments: [], durations: [] };
   const text = await res.text();

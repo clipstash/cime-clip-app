@@ -43,7 +43,7 @@
   });
 
   async function fetchSegment(segUrl: string): Promise<Uint8Array> {
-    const proxyUrl = `${API_URL}/proxy?url=${encodeURIComponent(segUrl)}`;
+    const proxyUrl = `${API_URL}/stream/proxy?url=${encodeURIComponent(segUrl)}`;
     const res = await fetch(proxyUrl);
     const buf = await res.arrayBuffer();
     return new Uint8Array(buf);

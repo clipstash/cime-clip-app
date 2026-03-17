@@ -140,14 +140,14 @@ const startSec     = $derived(startH * 3600 + startM * 60 + startS);
       // init 세그먼트 다운로드
       let initData: Uint8Array | null = null;
       if (initUrl) {
-        const proxyInit = `${API_URL}/proxy?url=${encodeURIComponent(initUrl)}`;
+        const proxyInit = `${API_URL}/stream/proxy?url=${encodeURIComponent(initUrl)}`;
         initData = await fetchFile(proxyInit);
       }
 
       // 선택된 세그먼트만 다운로드
       const segParts: Uint8Array[] = [];
       for (let idx = 0; idx < selectedIdxs.length; idx++) {
-        const segUrl = `${API_URL}/proxy?url=${encodeURIComponent(segments[selectedIdxs[idx]])}`;
+        const segUrl = `${API_URL}/stream/proxy?url=${encodeURIComponent(segments[selectedIdxs[idx]])}`;
         segParts.push(await fetchFile(segUrl));
         progress = Math.round(((idx + 1) / selectedIdxs.length) * 80);
         progressLabel = `${idx + 1} / ${selectedIdxs.length} 세그먼트`;
@@ -231,12 +231,12 @@ const startSec     = $derived(startH * 3600 + startM * 60 + startS);
 
       let vInitData: Uint8Array | null = null;
       if (vInitUrl) {
-        const proxyInit = `${API_URL}/proxy?url=${encodeURIComponent(vInitUrl)}`;
+        const proxyInit = `${API_URL}/stream/proxy?url=${encodeURIComponent(vInitUrl)}`;
         vInitData = await fetchFile(proxyInit);
       }
 
       for (let i = 0; i < segments.length; i++) {
-        const segUrl = `${API_URL}/proxy?url=${encodeURIComponent(segments[i])}`;
+        const segUrl = `${API_URL}/stream/proxy?url=${encodeURIComponent(segments[i])}`;
         const segData = await fetchFile(segUrl);
         const name = `vseg${String(i).padStart(5, '0')}.mp4`;
         if (vInitData) {
