@@ -16,7 +16,6 @@
   import PreviewModal from './PreviewModal.svelte';
   import SourcePreview from './SourcePreview.svelte';
   import ClipForm from './ClipForm.svelte';
-  import VideoForm from './VideoForm.svelte';
   import RecordForm from './RecordForm.svelte';
 
   // ── 공통 ──
@@ -170,10 +169,7 @@
     {/if}
 
     <div class="action-divider"></div>
-    <ClipForm {url} {totalSec} {durationLoaded} onSuccess={fetchClips} />
-
-    <div class="action-divider"></div>
-    <VideoForm {url} onSuccess={fetchVideos} />
+    <ClipForm {url} {totalSec} {durationLoaded} onSuccess={handleClipSuccess} onVideoSuccess={handleVideoSuccess} />
 
     <div class="action-divider"></div>
     <RecordForm {url} onSuccess={handleRecordSuccess} />

@@ -5,10 +5,11 @@
     url: string;
     totalSec: number;
     durationLoaded: boolean;
-    onSuccess: () => void;
+    onSuccess: (info: { title: string | null; startSec: number; endSec: number }) => void;
+    onVideoSuccess: (info: { title: string | null; url: string }) => void;
   };
 
-  const { url, totalSec, durationLoaded, onSuccess }: Props = $props();
+  const { url, totalSec, durationLoaded, onSuccess, onVideoSuccess }: Props = $props();
 
   let startH = $state(0), startM = $state(0), startS = $state(0);
   let endH   = $state(0), endM   = $state(0), endS   = $state(30);
@@ -96,6 +97,83 @@
     } catch (e) { err = e instanceof Error ? e.message : String(e); }
     finally { loading = false; }
   }
+
+  const busy = $derived(dlStatus === 'loading' || dlStatus === 'downloading' || dlStatus === 'encoding');
+
+  // ── VOD 다운로드 ──
+  let videoDlStatus = $state<DlStatus>('idle');
+  let videoProgress = $state(0);
+  let videoProgressLabel = $state('');
+
+  async function videoSubmit() {
+    if (!url || videoDlStatus !== 'idle') return;
+    videoDlStatus = 'loading';
+    videoProgress = 0;
+
+    try {
+      const info = await fetchClipInfo(url);
+      if (!info.m3u8_url) throw new Error('스트림 URL을 찾을 수 없습니다');
+
+      const segments = await parseM3u8(info.m3u8_url);
+      if (segments.length === 0) throw new Error('세그먼트를 찾을 수 없습니다');
+
+      const ffmpeg = new FFmpeg();
+      await ffmpeg.load({
+        coreURL: await toBlobURL(`${FFMPEG_CORE_URL}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await toBlobURL(`${FFMPEG_CORE_URL}/ffmpeg-core.wasm`, 'application/wasm')
+      });
+
+      videoDlStatus = 'downloading';
+      const segNames: string[] = [];
+
+      for (let i = 0; i < segments.length; i++) {
+        const segUrl = `${API_URL}/proxy?url=${encodeURIComponent(segments[i])}`;
+        const data = await fetchFile(segUrl);
+        const name = `seg${String(i).padStart(5, '0')}.ts`;
+        await ffmpeg.writeFile(name, data);
+        segNames.push(name);
+        videoProgress = Math.round(((i + 1) / segments.length) * 80);
+        videoProgressLabel = `${i + 1} / ${segments.length} 세그먼트`;
+      }
+
+      videoDlStatus = 'encoding';
+      videoProgressLabel = 'MP4 변환 중...';
+      videoProgress = 82;
+
+      const concatList = segNames.map((n) => `file '${n}'`).join('\n');
+      await ffmpeg.writeFile('concat.txt', concatList);
+      await ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', 'concat.txt', '-c', 'copy', 'output.mp4']);
+      videoProgress = 96;
+
+      const raw = (await ffmpeg.readFile('output.mp4')) as Uint8Array;
+      const buf = new ArrayBuffer(raw.byteLength);
+      new Uint8Array(buf).set(raw);
+      const blob = new Blob([buf], { type: 'video/mp4' });
+      const objUrl = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      const safe = (info.title ?? 'video').replace(/[\\/:*?"<>|]/g, '_');
+      a.href = objUrl;
+      a.download = `${safe}.mp4`;
+      a.click();
+      URL.revokeObjectURL(objUrl);
+
+      for (const name of segNames) await ffmpeg.deleteFile(name);
+      await ffmpeg.deleteFile('concat.txt');
+      await ffmpeg.deleteFile('output.mp4');
+
+      videoProgress = 100;
+      videoProgressLabel = '완료!';
+      videoDlStatus = 'done';
+      onVideoSuccess({ title: info.title, url });
+      setTimeout(() => { videoDlStatus = 'idle'; videoProgress = 0; videoProgressLabel = ''; }, 3000);
+    } catch (e) {
+      err = e instanceof Error ? e.message : String(e);
+      videoDlStatus = 'error';
+    }
+  }
+
+  const videoBusy = $derived(videoDlStatus === 'loading' || videoDlStatus === 'downloading' || videoDlStatus === 'encoding');
 </script>
 
 {#if durationLoaded}
@@ -151,6 +229,28 @@
   <button class="submit-btn" onclick={submit} disabled={loading || !url || !!timeError}>
     {loading ? '처리중...' : '클립 생성 ✦'}
   </button>
+  <button class="submit-btn" onclick={videoSubmit} disabled={videoBusy || !url}>
+    {videoDlStatus === 'done' ? '완료 ✓' : videoBusy ? '처리중...' : '전체 다운로드 ✦'}
+  </button>
 </div>
+
+{#if busy}
+  <div class="form-row">
+    <div class="dl-progress">
+      <div class="progress-bar"><div class="progress-fill" style="width: {progress}%"></div></div>
+      <span class="progress-label">{progressLabel}</span>
+    </div>
+  </div>
+{/if}
+
+{#if videoBusy}
+  <div class="form-row">
+    <div class="dl-progress">
+      <div class="progress-bar"><div class="progress-fill" style="width: {videoProgress}%"></div></div>
+      <span class="progress-label">{videoProgressLabel}</span>
+    </div>
+  </div>
+{/if}
+
 {#if timeError}<p class="error">{timeError}</p>
 {:else if err}<p class="error">{err}</p>{/if}
