@@ -1,13 +1,12 @@
 <script lang="ts">
-  import { FFmpeg } from '@ffmpeg/ffmpeg';
-  import { toBlobURL } from '@ffmpeg/util';
+  import { loadFfmpeg } from '$lib/ffmpeg';
   import { fetchClipInfo } from '$lib/api/clips';
-  import { parseM3u8 } from '$lib/api/stream';
+  import { parseM3u8 } from '$lib/utils/stream';
   import { API_URL } from '$lib/api/config';
 
   type Props = {
     url: string;
-    onSuccess?: (info: { filename: string; url: string }) => void;
+    onSuccess?: (info: { filename: string; url: string; blobUrl: string }) => void;
   };
 
   const { url, onSuccess }: Props = $props();
@@ -22,11 +21,11 @@
   let fileNameEdited = $state(false);
 
   let m3u8Url = '';
+  let initData: Uint8Array | null = null;
   let segments: Uint8Array[] = [];
   let segmentsSeen = new Set<string>();
   let pollTimerId: ReturnType<typeof setTimeout> | null = null;
 
-  const FFMPEG_CORE_URL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
 
   $effect(() => {
     const targetUrl = url;
@@ -51,8 +50,11 @@
   async function pollSegments() {
     if (status !== 'recording' || !m3u8Url) return;
     try {
-      const segs = await parseM3u8(m3u8Url);
-      for (const seg of segs) {
+      const { initUrl, segments: newSegs } = await parseM3u8(m3u8Url);
+      if (initUrl && !initData) {
+        initData = await fetchSegment(initUrl);
+      }
+      for (const seg of newSegs) {
         if (!segmentsSeen.has(seg)) {
           segmentsSeen.add(seg);
           const data = await fetchSegment(seg);
@@ -70,6 +72,7 @@
     if (!url || !recFileName || status !== 'idle') return;
     status = 'loading';
     err = '';
+    initData = null;
     segments = [];
     segmentsSeen = new Set();
     segCount = 0;
@@ -105,16 +108,19 @@
 
     try {
       status = 'encoding';
-      const ffmpeg = new FFmpeg();
-      await ffmpeg.load({
-        coreURL: await toBlobURL(`${FFMPEG_CORE_URL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${FFMPEG_CORE_URL}/ffmpeg-core.wasm`, 'application/wasm')
-      });
+      const ffmpeg = await loadFfmpeg();
 
       const segNames: string[] = [];
       for (let i = 0; i < segments.length; i++) {
-        const name = `seg${String(i).padStart(5, '0')}.ts`;
-        await ffmpeg.writeFile(name, segments[i]);
+        const name = `seg${String(i).padStart(5, '0')}.mp4`;
+        if (initData) {
+          const combined = new Uint8Array(initData.byteLength + segments[i].byteLength);
+          combined.set(initData, 0);
+          combined.set(segments[i], initData.byteLength);
+          await ffmpeg.writeFile(name, combined);
+        } else {
+          await ffmpeg.writeFile(name, segments[i]);
+        }
         segNames.push(name);
       }
 
@@ -133,14 +139,13 @@
       a.href = objUrl;
       a.download = `${safe}.mp4`;
       a.click();
-      URL.revokeObjectURL(objUrl);
 
       for (const name of segNames) await ffmpeg.deleteFile(name);
       await ffmpeg.deleteFile('concat.txt');
       await ffmpeg.deleteFile('output.mp4');
 
       status = 'done';
-      onSuccess?.({ filename: recFileName, url });
+      onSuccess?.({ filename: recFileName, url, blobUrl: objUrl });
       setTimeout(() => { reset(); }, 3000);
     } catch (e) {
       err = e instanceof Error ? e.message : String(e);
@@ -150,6 +155,7 @@
 
   function reset() {
     if (pollTimerId) { clearTimeout(pollTimerId); pollTimerId = null; }
+    initData = null;
     segments = [];
     segmentsSeen = new Set();
     segCount = 0;
