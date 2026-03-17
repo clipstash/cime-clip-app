@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { FFmpeg } from '@ffmpeg/ffmpeg';
-  import { fetchFile, toBlobURL } from '@ffmpeg/util';
+  import { fetchFile } from '@ffmpeg/util';
+  import { loadFfmpeg } from '$lib/ffmpeg';
   import { fetchClipInfo } from '$lib/api/clips';
-  import { parseM3u8 } from '$lib/api/stream';
+  import { parseM3u8 } from '$lib/utils/stream';
   import { API_URL } from '$lib/api/config';
 
   type Props = {
@@ -19,8 +19,6 @@
   let progress = $state(0);
   let progressLabel = $state('');
 
-  const FFMPEG_CORE_URL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
-
   async function submit() {
     if (!url || dlStatus !== 'idle') return;
     dlStatus = 'loading';
@@ -31,23 +29,32 @@
       const info = await fetchClipInfo(url);
       if (!info.m3u8_url) throw new Error('스트림 URL을 찾을 수 없습니다');
 
-      const segments = await parseM3u8(info.m3u8_url);
+      const { initUrl, segments } = await parseM3u8(info.m3u8_url);
       if (segments.length === 0) throw new Error('세그먼트를 찾을 수 없습니다');
 
-      const ffmpeg = new FFmpeg();
-      await ffmpeg.load({
-        coreURL: await toBlobURL(`${FFMPEG_CORE_URL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${FFMPEG_CORE_URL}/ffmpeg-core.wasm`, 'application/wasm')
-      });
+      const ffmpeg = await loadFfmpeg();
 
       dlStatus = 'downloading';
       const segNames: string[] = [];
 
+      let initData: Uint8Array | null = null;
+      if (initUrl) {
+        const proxyInit = `${API_URL}/proxy?url=${encodeURIComponent(initUrl)}`;
+        initData = await fetchFile(proxyInit);
+      }
+
       for (let i = 0; i < segments.length; i++) {
         const segUrl = `${API_URL}/proxy?url=${encodeURIComponent(segments[i])}`;
-        const data = await fetchFile(segUrl);
-        const name = `seg${String(i).padStart(5, '0')}.ts`;
-        await ffmpeg.writeFile(name, data);
+        const segData = await fetchFile(segUrl);
+        const name = `seg${String(i).padStart(5, '0')}.mp4`;
+        if (initData) {
+          const combined = new Uint8Array(initData.byteLength + segData.byteLength);
+          combined.set(initData, 0);
+          combined.set(segData, initData.byteLength);
+          await ffmpeg.writeFile(name, combined);
+        } else {
+          await ffmpeg.writeFile(name, segData);
+        }
         segNames.push(name);
         progress = Math.round(((i + 1) / segments.length) * 80);
         progressLabel = `${i + 1} / ${segments.length} 세그먼트`;
