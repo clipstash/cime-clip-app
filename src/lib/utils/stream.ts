@@ -1,50 +1,61 @@
+// ── m3u8 파싱 결과 타입 ───────────────────────────────────────────
 export type M3u8Info = {
-  initUrl: string | null;
-  segments: string[];
-  durations: number[];
+	initUrl: string | null; // fMP4 초기화 세그먼트 URL (없으면 null)
+	segments: string[]; // 미디어 세그먼트 URL 목록
+	durations: number[]; // 각 세그먼트의 재생 시간 (초)
 };
 
+// ── m3u8 플레이리스트 파싱 ────────────────────────────────────────
+// 프록시를 통해 m3u8을 가져온 뒤 세그먼트 목록과 init URL을 추출
+// 마스터 플레이리스트인 경우 첫 번째 서브 플레이리스트를 재귀 파싱
 export async function parseM3u8(m3u8Url: string): Promise<M3u8Info> {
-  const proxyUrl = `/stream/proxy?url=${encodeURIComponent(m3u8Url)}`;
-  const res = await fetch(proxyUrl);
-  if (!res.ok) return { initUrl: null, segments: [], durations: [] };
-  const text = await res.text();
-  const base = m3u8Url.substring(0, m3u8Url.lastIndexOf('/') + 1);
-
-  // Master playlist: contains #EXT-X-STREAM-INF → follow the first sub-playlist
-  if (text.includes('#EXT-X-STREAM-INF')) {
-    const lines = text.split('\n').map((l) => l.trim());
-    for (const line of lines) {
-      if (line && !line.startsWith('#')) {
-        const subUrl = line.startsWith('http') ? line : base + line;
-        return parseM3u8(subUrl);
-      }
-    }
+	const proxyUrl = `/stream/proxy?url=${encodeURIComponent(m3u8Url)}`;
+	const res = await fetch(proxyUrl);
+  
+	if (!res.ok) 
     return { initUrl: null, segments: [], durations: [] };
-  }
 
-  // Extract fMP4 init section (#EXT-X-MAP:URI="...")
-  let initUrl: string | null = null;
-  const mapMatch = text.match(/#EXT-X-MAP:URI="([^"]+)"/);
-  if (mapMatch) {
-    const raw = mapMatch[1];
-    initUrl = raw.startsWith('http') ? raw : base + raw;
-  }
+	const text = await res.text();
+	const base = m3u8Url.substring(0, m3u8Url.lastIndexOf('/') + 1);
 
-  const lines = text.split('\n').map((line) => line.trim());
-  const segments: string[] = [];
-  const durations: number[] = [];
-  let nextDuration = 0;
+	// 마스터 플레이리스트: #EXT-X-STREAM-INF 포함 → 첫 번째 서브 플레이리스트로 재귀
+	if (text.includes('#EXT-X-STREAM-INF')) {
+		const lines = text.split('\n').map((l) => l.trim());
+		for (const line of lines) {
+			if (line && !line.startsWith('#')) {
+				const subUrl = line.startsWith('http') ? line : base + line;
+				return parseM3u8(subUrl);
+			}
+		}
+		return { initUrl: null, segments: [], durations: [] };
+	}
 
-  for (const line of lines) {
-    if (line.startsWith('#EXTINF:')) {
-      nextDuration = parseFloat(line.slice(8).split(',')[0]) || 0;
-    } else if (line && !line.startsWith('#')) {
-      segments.push(line.startsWith('http') ? line : base + line);
-      durations.push(nextDuration);
-      nextDuration = 0;
-    }
-  }
+	// fMP4 초기화 세그먼트 추출 (#EXT-X-MAP:URI="...")
+	// 상대 경로이면 base를 붙여 절대 URL로 변환
+	let initUrl: string | null = null;
+	const mapMatch = text.match(/#EXT-X-MAP:URI="([^"]+)"/);
+  
+	if (mapMatch) {
+		const raw = mapMatch[1];
+		initUrl = raw.startsWith('http') ? raw : base + raw;
+	}
 
-  return { initUrl, segments, durations };
+	// 미디어 세그먼트 목록 및 각 세그먼트 재생 시간 추출
+	// #EXTINF 태그의 값을 nextDuration에 저장했다가 다음 세그먼트 URL에 매핑
+	const lines = text.split('\n').map((line) => line.trim());
+	const segments: string[] = [];
+	const durations: number[] = [];
+	let nextDuration = 0;
+
+	for (const line of lines) {
+		if (line.startsWith('#EXTINF:')) {
+			nextDuration = parseFloat(line.slice(8).split(',')[0]) || 0;
+		} else if (line && !line.startsWith('#')) {
+			segments.push(line.startsWith('http') ? line : base + line);
+			durations.push(nextDuration);
+			nextDuration = 0;
+		}
+	}
+
+	return { initUrl, segments, durations };
 }
