@@ -63,6 +63,7 @@
 		try {
 			// 1. 스트림 정보 조회 및 m3u8 URL 확인
 			const info = await fetchClipInfo(url);
+			if (!info) throw new Error('스트림 정보를 불러올 수 없습니다');
 			if (!info.m3u8_url) throw new Error('스트림 URL을 찾을 수 없습니다');
 
 			// 2. m3u8 파싱 → 세그먼트 목록 추출

@@ -36,14 +36,17 @@ class SourceStore {
 				this.loading = true;
 				const t = setTimeout(async () => {
 					const info = await fetchClipInfo(targetUrl);
+					if (!info) {
+						// API 오류: 라이브 여부 판단 불가 → isLive 변경 없이 로딩 종료
+						this.loading = false;
+						return;
+					}
 					this.title = info.title;
 					this.thumbnail = info.thumbnail;
+					this.isLive = info.is_live;
 					if (info.duration != null) {
 						this.totalSec = info.duration;
 						this.durationLoaded = true;
-						this.isLive = false;
-					} else {
-						this.isLive = true;
 					}
 					this.loading = false;
 				}, 600);

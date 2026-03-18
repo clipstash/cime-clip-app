@@ -12,8 +12,10 @@ export async function parseM3u8(m3u8Url: string): Promise<M3u8Info> {
 	const proxyUrl = `/stream/proxy?url=${encodeURIComponent(m3u8Url)}`;
 	const res = await fetch(proxyUrl);
   
-	if (!res.ok) 
-    return { initUrl: null, segments: [], durations: [] };
+	if (!res.ok) {
+		const msg = await res.text().catch(() => res.statusText);
+		throw new Error(`m3u8 fetch 실패 (${res.status}): ${msg}`);
+	}
 
 	const text = await res.text();
 	const base = m3u8Url.substring(0, m3u8Url.lastIndexOf('/') + 1);
