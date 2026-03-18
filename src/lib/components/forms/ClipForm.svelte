@@ -3,7 +3,6 @@
   import { loadFfmpeg } from '$lib/ffmpeg';
   import { fetchClipInfo } from '$lib/api/clips';
   import { parseM3u8 } from '$lib/utils/stream';
-  import { API_URL } from '$lib/api/config';
 
   type Props = {
     url: string;
@@ -144,7 +143,7 @@ const startSec     = $derived(startH * 3600 + startM * 60 + startS);
       // init 세그먼트 다운로드
       let initData: Uint8Array | null = null;
       if (initUrl) {
-        const proxyInit = `${API_URL}/stream/proxy?url=${encodeURIComponent(initUrl)}`;
+        const proxyInit = `/stream/proxy?url=${encodeURIComponent(initUrl)}`;
         initData = await fetchFile(proxyInit);
       }
 
@@ -152,7 +151,7 @@ const startSec     = $derived(startH * 3600 + startM * 60 + startS);
       const segParts: Uint8Array[] = [];
       for (let idx = 0; idx < selectedIdxs.length; idx++) {
         if (cancelClipRequested) { dlStatus = 'idle'; progress = 0; progressLabel = ''; return; }
-        const segUrl = `${API_URL}/stream/proxy?url=${encodeURIComponent(segments[selectedIdxs[idx]])}`;
+        const segUrl = `/stream/proxy?url=${encodeURIComponent(segments[selectedIdxs[idx]])}`;
         segParts.push(await fetchFile(segUrl));
         progress = Math.round(((idx + 1) / selectedIdxs.length) * 80);
         progressLabel = `${idx + 1} / ${selectedIdxs.length} 세그먼트`;
@@ -238,13 +237,13 @@ const startSec     = $derived(startH * 3600 + startM * 60 + startS);
 
       let vInitData: Uint8Array | null = null;
       if (vInitUrl) {
-        const proxyInit = `${API_URL}/stream/proxy?url=${encodeURIComponent(vInitUrl)}`;
+        const proxyInit = `/stream/proxy?url=${encodeURIComponent(vInitUrl)}`;
         vInitData = await fetchFile(proxyInit);
       }
 
       for (let i = 0; i < segments.length; i++) {
         if (cancelVideoRequested) { videoDlStatus = 'idle'; videoProgress = 0; videoProgressLabel = ''; return; }
-        const segUrl = `${API_URL}/stream/proxy?url=${encodeURIComponent(segments[i])}`;
+        const segUrl = `/stream/proxy?url=${encodeURIComponent(segments[i])}`;
         const segData = await fetchFile(segUrl);
         const name = `vseg${String(i).padStart(5, '0')}.mp4`;
         if (vInitData) {

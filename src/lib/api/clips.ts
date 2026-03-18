@@ -1,5 +1,3 @@
-import { API_URL } from './config';
-
 export type Clip = {
   id: string;
   platform: string;
@@ -22,7 +20,7 @@ export type ClipInfo = {
 
 export async function fetchClipInfo(url: string): Promise<ClipInfo> {
   try {
-    const res = await fetch(`${API_URL}/clips/info?url=${encodeURIComponent(url)}`);
+    const res = await fetch(`/clips/info?url=${encodeURIComponent(url)}`);
     if (!res.ok) return { title: null, duration: null, thumbnail: null, m3u8_url: null };
     const data = await res.json();
     const raw = data.duration;

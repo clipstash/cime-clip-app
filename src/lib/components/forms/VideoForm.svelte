@@ -3,7 +3,6 @@
   import { loadFfmpeg } from '$lib/ffmpeg';
   import { fetchClipInfo } from '$lib/api/clips';
   import { parseM3u8 } from '$lib/utils/stream';
-  import { API_URL } from '$lib/api/config';
 
   type Props = {
     url: string;
@@ -39,12 +38,12 @@
 
       let initData: Uint8Array | null = null;
       if (initUrl) {
-        const proxyInit = `${API_URL}/stream/proxy?url=${encodeURIComponent(initUrl)}`;
+        const proxyInit = `/stream/proxy?url=${encodeURIComponent(initUrl)}`;
         initData = await fetchFile(proxyInit);
       }
 
       for (let i = 0; i < segments.length; i++) {
-        const segUrl = `${API_URL}/stream/proxy?url=${encodeURIComponent(segments[i])}`;
+        const segUrl = `/stream/proxy?url=${encodeURIComponent(segments[i])}`;
         const segData = await fetchFile(segUrl);
         const name = `seg${String(i).padStart(5, '0')}.mp4`;
         if (initData) {

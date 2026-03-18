@@ -3,7 +3,6 @@
   import { loadFfmpeg } from '$lib/ffmpeg';
   import { fetchClipInfo } from '$lib/api/clips';
   import { parseM3u8 } from '$lib/utils/stream';
-  import { API_URL } from '$lib/api/config';
 
   type Props = {
     url: string;
@@ -44,7 +43,7 @@
   });
 
   async function fetchSegment(segUrl: string): Promise<Uint8Array> {
-    const proxyUrl = `${API_URL}/stream/proxy?url=${encodeURIComponent(segUrl)}`;
+    const proxyUrl = `/stream/proxy?url=${encodeURIComponent(segUrl)}`;
     const res = await fetch(proxyUrl);
     const buf = await res.arrayBuffer();
     return new Uint8Array(buf);

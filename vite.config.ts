@@ -12,10 +12,5 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp'
     },
-    proxy: {
-      '/api': 'http://localhost:8000',
-      '/files': 'http://localhost:8000',
-      '/recordings': 'http://localhost:8000'
-    }
   }
 });
