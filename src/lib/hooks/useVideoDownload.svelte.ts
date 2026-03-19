@@ -7,17 +7,18 @@ import { fetchClipInfo } from '$lib/api/clips';
 import { parseM3u8 } from '$lib/utils/stream';
 
 // ── 상태 타입 ────────────────────────────────────────────────────
-type DlStatus = 'idle' | 'loading' | 'downloading' | 'encoding' | 'done' | 'error';
+type DlStatus = 'idle' | 'loading' | 'downloading' | 'encoding' | 'error';
+
+const MAX_CLIP_SEC = 3600; // 60분 최대 파트 길이
 
 // ── 전체 영상 다운로드 훅 ─────────────────────────────────────────
-// m3u8 → 전체 세그먼트 다운로드 → FFmpeg concat → Blob URL 반환
-export function useVideoDownload(onSuccess?: (info: { title: string | null; url: string }) => void) {
+// m3u8 → 전체 세그먼트 다운로드 → FFmpeg concat → 파트별 onSuccess 콜백
+// 60분 초과 시 파트별 분할
+export function useVideoDownload(onSuccess?: (info: { title: string | null; url: string; blobUrl: string; filename: string }) => void) {
 	// ── 반응형 상태 ──────────────────────────────────────────────────
 	let status = $state<DlStatus>('idle');
 	let progress = $state(0); // 진행률 (0~100)
 	let progressLabel = $state(''); // 진행 상태 텍스트 (UI 표시용)
-	let blobUrl = $state(''); // 완성된 영상의 Blob URL
-	let fileName = $state(''); // 다운로드 파일명
 	let err = $state(''); // 에러 메시지
 
 	// ── 내부 변수 (반응형 불필요) ─────────────────────────────────────
@@ -40,21 +41,34 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 			if (!info || !info.m3u8_url) throw new Error('스트림 URL을 찾을 수 없습니다');
 
 			// 2. m3u8 파싱 → 전체 세그먼트 목록 추출
-			const { initUrl, segments } = await parseM3u8(info.m3u8_url);
+			const { initUrl, segments, durations } = await parseM3u8(info.m3u8_url);
 			if (segments.length === 0) throw new Error('세그먼트를 찾을 수 없습니다');
 
-			// 3. FFmpeg 로드
+			// 3. 세그먼트를 60분 단위 파트로 그룹화
+			const partGroups: number[][] = [[]];
+			let cumDur = 0;
+			for (let i = 0; i < segments.length; i++) {
+				const d = durations[i] || 2;
+				if (cumDur + d > MAX_CLIP_SEC && partGroups[partGroups.length - 1].length > 0) {
+					partGroups.push([]);
+					cumDur = 0;
+				}
+				partGroups[partGroups.length - 1].push(i);
+				cumDur += d;
+			}
+
+			// 4. FFmpeg 로드
 			const ffmpeg = await loadFfmpeg();
 			status = 'downloading';
 			const segNames: string[] = [];
 
-			// 4. 초기화 세그먼트(init) 다운로드 (fMP4 포맷일 때 필요)
+			// 5. 초기화 세그먼트(init) 다운로드 (fMP4 포맷일 때 필요)
 			let initData: Uint8Array | null = null;
 			if (initUrl) {
 				initData = await fetchFile(`/stream/proxy?url=${encodeURIComponent(initUrl)}`);
 			}
 
-			// 5. 전체 세그먼트 순차 다운로드 (취소 요청 시 중단)
+			// 6. 전체 세그먼트 순차 다운로드 (취소 요청 시 중단)
 			//    fMP4이면 initData를 각 세그먼트 앞에 붙여 독립 재생 가능하게 처리
 			for (let i = 0; i < segments.length; i++) {
 				if (cancelRequested) {
@@ -84,54 +98,44 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 				return;
 			}
 
-			// 6. FFmpeg concat으로 세그먼트 이어붙이기 (스트림 복사)
+			// 7. 파트별 FFmpeg concat (스트림 복사) → 파트별 onSuccess 콜백
 			status = 'encoding';
-			progressLabel = 'MP4 변환 중...';
-			progress = 82;
+			const numParts = partGroups.length;
+			const baseName = (info.title ?? 'video').replace(/[\\/:*?"<>|]/g, '_');
 
-			const concatList = segNames.map((n) => `file '${n}'`).join('\n');
-			await ffmpeg.writeFile('concat.txt', concatList);
-			await ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', 'concat.txt', '-c', 'copy', 'output.mp4']);
-			progress = 96;
+			for (let p = 0; p < numParts; p++) {
+				const outFile = `output_${p}.mp4`;
+				progressLabel = numParts > 1
+					? `파트 ${p + 1}/${numParts} 인코딩 중...`
+					: 'MP4 변환 중...';
+				progress = 82 + Math.round((p / numParts) * 14);
 
-			// 7. 결과 파일을 Blob URL로 변환
-			const raw = (await ffmpeg.readFile('output.mp4')) as Uint8Array;
-			const buf = new ArrayBuffer(raw.byteLength);
-			new Uint8Array(buf).set(raw);
-			const blob = new Blob([buf], { type: 'video/mp4' });
-			const objUrl = URL.createObjectURL(blob);
+				const concatList = partGroups[p].map((i) => `file '${segNames[i]}'`).join('\n');
+				await ffmpeg.writeFile('concat.txt', concatList);
+				await ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', 'concat.txt', '-c', 'copy', outFile]);
+				await ffmpeg.deleteFile('concat.txt');
 
-			// 8. FFmpeg 임시 파일 정리
+				const raw = (await ffmpeg.readFile(outFile)) as Uint8Array;
+				const buf = new ArrayBuffer(raw.byteLength);
+				new Uint8Array(buf).set(raw);
+				const blob = new Blob([buf], { type: 'video/mp4' });
+				const blobUrl = URL.createObjectURL(blob);
+				const filename = numParts > 1 ? `${baseName}_part${p + 1}.mp4` : `${baseName}.mp4`;
+				onSuccess?.({ title: info.title, url, blobUrl, filename });
+				await ffmpeg.deleteFile(outFile);
+			}
+
+			// 8. FFmpeg 세그먼트 파일 정리
 			for (const name of segNames) await ffmpeg.deleteFile(name);
-			await ffmpeg.deleteFile('concat.txt');
-			await ffmpeg.deleteFile('output.mp4');
 
 			// 9. 완료 처리
 			progress = 100;
 			progressLabel = '완료!';
-			blobUrl = objUrl;
-			fileName = `${(info.title ?? 'video').replace(/[\\/:*?"<>|]/g, '_')}.mp4`;
-			status = 'done';
-			onSuccess?.({ title: info.title, url });
+			status = 'idle';
 		} catch (e) {
 			err = e instanceof Error ? e.message : String(e);
 			status = 'error';
 		}
-	}
-
-	// ── 파일 다운로드 트리거 ──────────────────────────────────────────
-	// Blob URL로 앵커 클릭 → 다운로드 후 URL 해제 및 상태 초기화
-	function triggerDownload() {
-		const a = document.createElement('a');
-		a.href = blobUrl;
-		a.download = fileName;
-		a.click();
-		URL.revokeObjectURL(blobUrl);
-		blobUrl = '';
-		fileName = '';
-		status = 'idle';
-		progress = 0;
-		progressLabel = '';
 	}
 
 	// ── 다운로드 취소 ─────────────────────────────────────────────────
@@ -151,9 +155,6 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 		get progressLabel() {
 			return progressLabel;
 		},
-		get blobUrl() {
-			return blobUrl;
-		},
 		get err() {
 			return err;
 		},
@@ -161,7 +162,6 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 			return busy;
 		},
 		download,
-		triggerDownload,
 		cancel
 	};
 }

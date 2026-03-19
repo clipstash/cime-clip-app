@@ -8,10 +8,14 @@
 	import HmsInput from '../ui/HmsInput.svelte';
 	import TimelineSlider from '../ui/TimelineSlider.svelte';
 	import ProgressBar from '../ui/ProgressBar.svelte';
+	import PreviewCard from '../cards/PreviewCard.svelte';
 
 	// ── Props 타입 ───────────────────────────────────────────────────
 	type Props = {
 		url: string;
+		title: string | null;
+		streamer: string | null;
+		thumbnail: string | null;
 		totalSec: number;
 		durationLoaded: boolean;
 		onSuccess: (info: {
@@ -19,11 +23,12 @@
 			startSec: number;
 			endSec: number;
 			blobUrl: string;
+			filename: string;
 		}) => void;
-		onVideoSuccess: (info: { title: string | null; url: string }) => void;
+		onVideoSuccess: (info: { title: string | null; url: string; blobUrl: string; filename: string }) => void;
 	};
 
-	const { url, totalSec, durationLoaded, onSuccess, onVideoSuccess }: Props = $props();
+	const { url, title, streamer, thumbnail, totalSec, durationLoaded, onSuccess, onVideoSuccess }: Props = $props();
 
 	// ── 훅 초기화 ────────────────────────────────────────────────────
 	// 시간 범위(시작~종료) 및 타임라인 슬라이더 상태 관리
@@ -36,20 +41,46 @@
 	const videoDl = useVideoDownload((info) => onVideoSuccess(info));
 
 	// ── 클립 다운로드 상태 ───────────────────────────────────────────
-	type DlStatus = 'idle' | 'loading' | 'downloading' | 'encoding' | 'done' | 'error';
+	type DlStatus = 'idle' | 'loading' | 'downloading' | 'encoding' | 'error';
+
+	const MAX_CLIP_SEC = 3600; // 60분 최대 클립 길이
 
 	let err = $state('');
 	let cancelClipRequested = $state(false);
 	let dlStatus = $state<DlStatus>('idle');
 	let progress = $state(0);
 	let progressLabel = $state('');
-	let dlBlobUrl = $state('');
-	let dlFileName = $state('');
 
 	// 처리 중 여부 (버튼 비활성화 등에 사용)
 	const busy = $derived(
 		dlStatus === 'loading' || dlStatus === 'downloading' || dlStatus === 'encoding'
 	);
+
+	// 파일명 베이스: [스트리머] 제목_YYYYMMDD 형식 (녹화와 동일)
+	function makeBaseName(t: string | null, s: string | null): string {
+		const today = new Date();
+		const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+		const raw = s ? `[${s}] ${t ?? 'clip'}_${dateStr}` : `${t ?? 'clip'}_${dateStr}`;
+		return raw.replace(/[\\/:*?"<>|]/g, '_');
+	}
+
+	// 생성 예정 파일 목록 (클립 파트)
+	const previewFiles = $derived.by(() => {
+		if (!durationLoaded) return [];
+		const baseName = makeBaseName(title, streamer);
+		const files: { filename: string; timeLabel: string }[] = [];
+		const clipCount = Math.ceil(tr.clipDuration / MAX_CLIP_SEC);
+		if (clipCount <= 1) {
+			files.push({ filename: `${baseName}.mp4`, timeLabel: `${tr.formatTime(tr.startSec)} ~ ${tr.formatTime(tr.endSec)}` });
+		} else {
+			for (let i = 0; i < clipCount; i++) {
+				const start = tr.startSec + i * MAX_CLIP_SEC;
+				const end = Math.min(tr.startSec + (i + 1) * MAX_CLIP_SEC, tr.endSec);
+				files.push({ filename: `${baseName}_part${i + 1}.mp4`, timeLabel: `${tr.formatTime(start)} ~ ${tr.formatTime(end)}` });
+			}
+		}
+		return files;
+	});
 
 	// ── 클립 생성 ────────────────────────────────────────────────────
 	async function submit() {
@@ -116,68 +147,60 @@
 			}
 
 			// 7. 세그먼트 바이너리 병합 → FFmpeg 입력 파일로 기록
-			const parts: Uint8Array[] = initData ? [initData, ...segParts] : segParts;
-			const totalBytes = parts.reduce((a, p) => a + p.byteLength, 0);
+			const combined_parts: Uint8Array[] = initData ? [initData, ...segParts] : segParts;
+			const totalBytes = combined_parts.reduce((a, p) => a + p.byteLength, 0);
 			const combined = new Uint8Array(totalBytes);
 			let byteOffset = 0;
-			for (const part of parts) {
+			for (const part of combined_parts) {
 				combined.set(part, byteOffset);
 				byteOffset += part.byteLength;
 			}
 			await ffmpeg.writeFile('input.mp4', combined);
 
-			// 8. FFmpeg로 구간 트림 (스트림 복사 방식 — 재인코딩 없음)
+			// 8. FFmpeg로 구간 트림 — 60분 초과 시 파트별 분할 → 파트별 onSuccess 콜백
 			dlStatus = 'encoding';
-			progressLabel = 'MP4 변환 중...';
-			progress = 82;
-			await ffmpeg.exec([
-				'-ss', String(tr.startSec),
-				'-i', 'input.mp4',
-				'-t', String(tr.endSec - tr.startSec),
-				'-c', 'copy',
-				'output.mp4'
-			]);
-			progress = 96;
+			const totalClipDur = tr.endSec - tr.startSec;
+			const numParts = Math.ceil(totalClipDur / MAX_CLIP_SEC);
+			const baseName = makeBaseName(info.title, info.streamer);
 
-			// 9. 결과 파일을 Blob URL로 변환
-			const raw = (await ffmpeg.readFile('output.mp4')) as Uint8Array;
-			const buf = new ArrayBuffer(raw.byteLength);
-      
-			new Uint8Array(buf).set(raw);
-			const blob = new Blob([buf], { type: 'video/mp4' });
-			const objUrl = URL.createObjectURL(blob);
+			for (let i = 0; i < numParts; i++) {
+				const chunkStart = tr.startSec + i * MAX_CLIP_SEC;
+				const chunkDur = Math.min(MAX_CLIP_SEC, tr.endSec - chunkStart);
+				const outFile = `output_${i}.mp4`;
 
-			// 10. FFmpeg 임시 파일 정리
+				progressLabel = numParts > 1
+					? `파트 ${i + 1}/${numParts} 인코딩 중...`
+					: 'MP4 변환 중...';
+				progress = 82 + Math.round((i / numParts) * 14);
+
+				await ffmpeg.exec([
+					'-ss', String(chunkStart),
+					'-i', 'input.mp4',
+					'-t', String(chunkDur),
+					'-c', 'copy',
+					outFile
+				]);
+
+				const raw = (await ffmpeg.readFile(outFile)) as Uint8Array;
+				const buf = new ArrayBuffer(raw.byteLength);
+				new Uint8Array(buf).set(raw);
+				const blob = new Blob([buf], { type: 'video/mp4' });
+				const filename = numParts > 1 ? `${baseName}_part${i + 1}.mp4` : `${baseName}.mp4`;
+				onSuccess({ title: info.title, startSec: chunkStart, endSec: chunkStart + chunkDur, blobUrl: URL.createObjectURL(blob), filename });
+				await ffmpeg.deleteFile(outFile);
+			}
+
+			// 9. FFmpeg 입력 파일 정리
 			await ffmpeg.deleteFile('input.mp4');
-			await ffmpeg.deleteFile('output.mp4');
 
-			// 11. 완료 처리
+			// 10. 완료 처리
 			progress = 100;
 			progressLabel = '완료!';
-			dlBlobUrl = objUrl;
-			dlFileName = `${(info.title ?? 'clip').replace(/[\\/:*?"<>|]/g, '_')}.mp4`;
-			dlStatus = 'done';
-			onSuccess({ title: info.title, startSec: tr.startSec, endSec: tr.endSec, blobUrl: objUrl });
+			dlStatus = 'idle';
 		} catch (e) {
 			err = e instanceof Error ? e.message : String(e);
 			dlStatus = 'error';
 		}
-	}
-
-	// ── 클립 파일 다운로드 트리거 ────────────────────────────────────
-	function triggerDownload() {
-		const a = document.createElement('a');
-		a.href = dlBlobUrl;
-		a.download = dlFileName;
-		a.click();
-
-		// Blob URL 해제 및 상태 초기화
-		URL.revokeObjectURL(dlBlobUrl);
-		dlBlobUrl = '';
-		dlFileName = '';
-		dlStatus = 'idle';
-		progress = 0;
-		progressLabel = '';
 	}
 </script>
 
@@ -231,20 +254,16 @@
 		/>
 	</div>
 
-	<!-- 클립 생성 버튼 (상태에 따라 다운로드 / 처리중 / 생성 표시) -->
-	{#if dlStatus === 'done'}
-		<button class="submit-btn" onclick={triggerDownload}>다운로드 ↓</button>
-	{:else if busy}
+	<!-- 클립 생성 버튼 -->
+	{#if busy}
 		<button class="submit-btn" disabled>처리중...</button>
 		<button class="cancel-btn" onclick={() => (cancelClipRequested = true)}>취소 ✕</button>
 	{:else}
 		<button class="submit-btn" onclick={submit} disabled={!url || !!tr.timeError}>클립 생성 ✦</button>
 	{/if}
 
-	<!-- 전체 영상 다운로드 버튼 (상태에 따라 다운로드 / 처리중 / 전체 다운로드 표시) -->
-	{#if videoDl.status === 'done'}
-		<button class="submit-btn" onclick={videoDl.triggerDownload}>다운로드 ↓</button>
-	{:else if videoDl.busy}
+	<!-- 전체 영상 다운로드 버튼 -->
+	{#if videoDl.busy}
 		<button class="submit-btn" disabled>처리중...</button>
 		<button class="cancel-btn" onclick={videoDl.cancel}>취소 ✕</button>
 	{:else}
@@ -268,8 +287,17 @@
 <!-- ── 에러 메시지 ── -->
 {#if tr.timeError}
 	<p class="error">{tr.timeError}</p>
-{:else if err}
+{/if}
+{#if err}
 	<p class="error">{err}</p>
-{:else if videoDl.err}
+{/if}
+{#if videoDl.err}
 	<p class="error">{videoDl.err}</p>
+{/if}
+
+<!-- ── 생성 예정 파일 미리보기 ── -->
+{#if url && durationLoaded && !busy && !videoDl.busy}
+	<div class="preview-grid">
+		<PreviewCard files={previewFiles} {title} {streamer} {thumbnail} />
+	</div>
 {/if}
