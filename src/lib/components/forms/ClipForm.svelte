@@ -5,10 +5,10 @@
 	import { parseM3u8 } from '$lib/utils/stream';
 	import { useTimeRange } from '$lib/hooks/useTimeRange.svelte';
 	import { useVideoDownload } from '$lib/hooks/useVideoDownload.svelte';
+	import { clipListStore } from '$lib/stores/clipListStore.svelte';
 	import HmsInput from '../ui/HmsInput.svelte';
 	import TimelineSlider from '../ui/TimelineSlider.svelte';
 	import ProgressBar from '../ui/ProgressBar.svelte';
-	import PreviewCard from '../cards/PreviewCard.svelte';
 
 	// ── Props 타입 ───────────────────────────────────────────────────
 	type Props = {
@@ -80,6 +80,24 @@
 			}
 		}
 		return files;
+	});
+
+	// 생성 예정 미리보기를 clipListStore에 동기화
+	$effect(() => {
+		if (!url || !durationLoaded || previewFiles.length === 0) {
+			clipListStore.setPreview(null);
+			return () => clipListStore.setPreview(null);
+		}
+		clipListStore.setPreview({
+			files: previewFiles,
+			title,
+			streamer,
+			thumbnail,
+			busy,
+			progress,
+			progressLabel
+		});
+		return () => clipListStore.setPreview(null);
 	});
 
 	// ── 클립 생성 ────────────────────────────────────────────────────
@@ -295,9 +313,3 @@
 	<p class="error">{videoDl.err}</p>
 {/if}
 
-<!-- ── 생성 예정 파일 미리보기 ── -->
-{#if url && durationLoaded && !busy && !videoDl.busy}
-	<div class="preview-grid">
-		<PreviewCard files={previewFiles} {title} {streamer} {thumbnail} />
-	</div>
-{/if}

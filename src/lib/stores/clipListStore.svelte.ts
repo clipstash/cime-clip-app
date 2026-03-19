@@ -14,6 +14,31 @@ class ClipListStore {
 	videos = $state<Video[]>([]); // 완료된 전체 영상 다운로드 목록
 	records = $state<ActiveRecord[]>([]); // 완료된 녹화 목록
 
+	// ── 생성 예정 미리보기 상태 ──────────────────────────────────────
+	preview = $state<{
+		files: { filename: string; timeLabel: string }[];
+		title: string | null;
+		streamer: string | null;
+		thumbnail: string | null;
+		busy: boolean;
+		progress: number;
+		progressLabel: string;
+	} | null>(null);
+
+	setPreview(
+		data: {
+			files: { filename: string; timeLabel: string }[];
+			title: string | null;
+			streamer: string | null;
+			thumbnail: string | null;
+			busy: boolean;
+			progress: number;
+			progressLabel: string;
+		} | null
+	) {
+		this.preview = data;
+	}
+
 	// ── 모달 상태 ───────────────────────────────────────────────────
 	modalUrl = $state(''); // 미리보기 모달에 표시할 영상 URL
 	showModal = $state(false); // 모달 표시 여부
