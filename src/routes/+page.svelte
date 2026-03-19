@@ -42,6 +42,9 @@
       <div class="action-divider"></div>
       <ClipForm
         url={sourceStore.url}
+        title={sourceStore.title}
+        streamer={sourceStore.streamer}
+        thumbnail={sourceStore.thumbnail}
         totalSec={sourceStore.totalSec}
         durationLoaded={sourceStore.durationLoaded}
         onSuccess={(info) => clipListStore.addClip(info)}

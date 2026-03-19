@@ -8,6 +8,7 @@ class SourceStore {
 	// ── 반응형 상태 ────────────────────────────────────────────────
 	url = $state(''); // 사용자가 입력한 스트림 URL
 	title = $state<string | null>(null); // 스트림 제목
+	streamer = $state<string | null>(null); // 스트리머 이름
 	thumbnail = $state<string | null>(null); // 썸네일 이미지 URL
 	isLive = $state(false); // 라이브 스트림 여부 (duration이 없으면 true)
 	loading = $state(false); // 메타데이터 조회 중 여부
@@ -23,6 +24,7 @@ class SourceStore {
 				void this.url;
 				this.durationLoaded = false;
 				this.title = null;
+				this.streamer = null;
 				this.thumbnail = null;
 				this.isLive = false;
 				this.loading = false;
@@ -42,6 +44,7 @@ class SourceStore {
 						return;
 					}
 					this.title = info.title;
+					this.streamer = info.streamer;
 					this.thumbnail = info.thumbnail;
 					this.isLive = info.is_live;
 					if (info.duration != null) {
