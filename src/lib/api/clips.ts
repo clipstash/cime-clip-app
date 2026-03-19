@@ -9,6 +9,7 @@ export type Clip = {
   file_url?: string | null;
   file_size?: number;
   error_message?: string | null;
+  download_name?: string;
 };
 
 export type ClipInfo = {

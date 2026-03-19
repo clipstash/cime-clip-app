@@ -14,6 +14,31 @@ class ClipListStore {
 	videos = $state<Video[]>([]); // 완료된 전체 영상 다운로드 목록
 	records = $state<ActiveRecord[]>([]); // 완료된 녹화 목록
 
+	// ── 생성 예정 미리보기 상태 ──────────────────────────────────────
+	preview = $state<{
+		files: { filename: string; timeLabel: string }[];
+		title: string | null;
+		streamer: string | null;
+		thumbnail: string | null;
+		busy: boolean;
+		progress: number;
+		progressLabel: string;
+	} | null>(null);
+
+	setPreview(
+		data: {
+			files: { filename: string; timeLabel: string }[];
+			title: string | null;
+			streamer: string | null;
+			thumbnail: string | null;
+			busy: boolean;
+			progress: number;
+			progressLabel: string;
+		} | null
+	) {
+		this.preview = data;
+	}
+
 	// ── 모달 상태 ───────────────────────────────────────────────────
 	modalUrl = $state(''); // 미리보기 모달에 표시할 영상 URL
 	showModal = $state(false); // 모달 표시 여부
@@ -54,7 +79,7 @@ class ClipListStore {
 
 	// ── 클립 추가 ───────────────────────────────────────────────────
 	// 클립 생성 완료 시 목록 맨 앞에 삽입
-	addClip(info: { title: string | null; startSec: number; endSec: number; blobUrl: string }) {
+	addClip(info: { title: string | null; startSec: number; endSec: number; blobUrl: string; filename: string }) {
 		const clip: Clip = {
 			id: crypto.randomUUID(),
 			platform: 'browser',
@@ -62,19 +87,22 @@ class ClipListStore {
 			title: info.title ?? undefined,
 			start_time: info.startSec,
 			end_time: info.endSec,
-			file_url: info.blobUrl
+			file_url: info.blobUrl,
+			download_name: info.filename
 		};
 		this.clips = [clip, ...this.clips];
 	}
 
 	// ── 영상 추가 ───────────────────────────────────────────────────
 	// 전체 영상 다운로드 완료 시 목록 맨 앞에 삽입
-	addVideo(info: { title: string | null; url: string }) {
+	addVideo(info: { title: string | null; url: string; blobUrl: string; filename: string }) {
 		const video: Video = {
 			id: crypto.randomUUID(),
 			url: info.url,
 			status: 'completed',
-			title: info.title ?? undefined
+			title: info.title ?? undefined,
+			file_url: info.blobUrl,
+			download_name: info.filename
 		};
 		this.videos = [video, ...this.videos];
 	}

@@ -11,6 +11,7 @@
   import SourcePreview from '$lib/components/SourcePreview.svelte';
   import ClipForm from '$lib/components/forms/ClipForm.svelte';
   import RecordForm from '$lib/components/forms/RecordForm.svelte';
+  import PreviewCard from '$lib/components/cards/PreviewCard.svelte';
 </script>
 
 <Background />
@@ -42,6 +43,9 @@
       <div class="action-divider"></div>
       <ClipForm
         url={sourceStore.url}
+        title={sourceStore.title}
+        streamer={sourceStore.streamer}
+        thumbnail={sourceStore.thumbnail}
         totalSec={sourceStore.totalSec}
         durationLoaded={sourceStore.durationLoaded}
         onSuccess={(info) => clipListStore.addClip(info)}
@@ -56,31 +60,48 @@
   </div>
 </section>
 
+{#if clipListStore.preview}
+<section class="clips-section">
+  <h2>생성 예정</h2>
+  <div class="clips-grid">
+    <PreviewCard
+      files={clipListStore.preview.files}
+      title={clipListStore.preview.title}
+      streamer={clipListStore.preview.streamer}
+      thumbnail={clipListStore.preview.thumbnail}
+      busy={clipListStore.preview.busy}
+      progress={clipListStore.preview.progress}
+      progressLabel={clipListStore.preview.progressLabel}
+    />
+  </div>
+</section>
+{/if}
+
 {#if clipListStore.clips.length > 0 || clipListStore.videos.length > 0 || clipListStore.records.length > 0}
 <section class="clips-section">
   <h2>목록</h2>
-    <div class="clips-grid">
-      {#each clipListStore.clips as clip (clip.id)}
-        <ClipCard {clip} onRemove={(id) => clipListStore.removeClip(id)} onPreview={(u) => clipListStore.openModal(u)} />
-      {/each}
+  <div class="clips-grid">
+    {#each clipListStore.clips as clip (clip.id)}
+      <ClipCard {clip} onRemove={(id) => clipListStore.removeClip(id)} onPreview={(u) => clipListStore.openModal(u)} />
+    {/each}
 
-      {#each clipListStore.videos as video (video.id)}
-        <VideoCard {video} onRemove={(id) => clipListStore.removeVideo(id)} onPreview={(u) => clipListStore.openModal(u)} />
-      {/each}
+    {#each clipListStore.videos as video (video.id)}
+      <VideoCard {video} onRemove={(id) => clipListStore.removeVideo(id)} onPreview={(u) => clipListStore.openModal(u)} />
+    {/each}
 
-      {#each clipListStore.records as record (record.filename)}
-        <RecordCard
-          {record}
-          isPaused={false}
-          onPause={() => {}}
-          onResume={() => {}}
-          onStop={() => {}}
-          onCancel={() => {}}
-          onRemove={(f) => clipListStore.removeRecord(f)}
-          onPreview={(u) => clipListStore.openModal(u)}
-        />
-      {/each}
-    </div>
+    {#each clipListStore.records as record (record.filename)}
+      <RecordCard
+        {record}
+        isPaused={false}
+        onPause={() => {}}
+        onResume={() => {}}
+        onStop={() => {}}
+        onCancel={() => {}}
+        onRemove={(f) => clipListStore.removeRecord(f)}
+        onPreview={(u) => clipListStore.openModal(u)}
+      />
+    {/each}
+  </div>
 </section>
 {/if}
 

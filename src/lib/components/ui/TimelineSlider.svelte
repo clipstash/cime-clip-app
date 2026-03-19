@@ -22,10 +22,12 @@
     <div class="timeline-fill" style="left: {startPct}%; width: {Math.max(0, endPct - startPct)}%"></div>
     <div class="timeline-handle" style="left: {startPct}%"
       onpointerdown={(e) => onStartDrag(e, 'start')} onpointermove={onDragMove} onpointerup={onDragEnd}
+      onclick={(e) => e.stopPropagation()}
       role="slider" aria-label="시작 지점" aria-valuenow={startSec} aria-valuemin={0} aria-valuemax={totalSec} tabindex="0"
     ></div>
     <div class="timeline-handle" style="left: {endPct}%"
       onpointerdown={(e) => onStartDrag(e, 'end')} onpointermove={onDragMove} onpointerup={onDragEnd}
+      onclick={(e) => e.stopPropagation()}
       role="slider" aria-label="종료 지점" aria-valuenow={endSec} aria-valuemin={0} aria-valuemax={totalSec} tabindex="0"
     ></div>
   </div>

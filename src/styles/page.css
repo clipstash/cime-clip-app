@@ -339,6 +339,107 @@ h2 {
   font-size: 0.85rem;
 }
 
+.info {
+  color: #60a5fa;
+  font-size: 0.85rem;
+}
+
+.split-preview {
+  padding: 0 1.1rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.split-preview .info {
+  margin: 0;
+}
+.parts-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.parts-list li {
+  font-size: 0.75rem;
+  color: #3b6ea8;
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  padding-left: 0.9rem;
+  position: relative;
+}
+.parts-list li::before {
+  content: '·';
+  position: absolute;
+  left: 0.2rem;
+  color: #2a4a70;
+}
+
+/* ── 결과 파일 목록 ── */
+.result-list {
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0 1.1rem 0.6rem;
+}
+.result-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.result-name {
+  flex: 1;
+  font-size: 0.78rem;
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  color: #3b6ea8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dl-btn {
+  flex-shrink: 0;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.85rem;
+  background: #e8f0fb;
+  color: #2a4a70;
+  border: 1px solid #b0c8e8;
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.dl-btn:hover {
+  background: #d0e4f8;
+}
+
+/* ── 파일 미리보기 목록 ── */
+.preview-list {
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0 1.1rem 0.6rem;
+}
+.preview-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.preview-badge {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  color: #444;
+}
+.preview-split-note {
+  font-size: 0.75rem;
+  color: #555;
+  margin: 0 0 0.15rem;
+}
+
+.preview-grid {
+  padding: 0 1.1rem 0.8rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
 /* ── List section (shared) ── */
 .clips-section {
   position: relative;
