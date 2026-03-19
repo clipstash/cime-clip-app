@@ -54,7 +54,7 @@ class ClipListStore {
 
 	// ── 클립 추가 ───────────────────────────────────────────────────
 	// 클립 생성 완료 시 목록 맨 앞에 삽입
-	addClip(info: { title: string | null; startSec: number; endSec: number; blobUrl: string }) {
+	addClip(info: { title: string | null; startSec: number; endSec: number; blobUrl: string; filename: string }) {
 		const clip: Clip = {
 			id: crypto.randomUUID(),
 			platform: 'browser',
@@ -62,19 +62,22 @@ class ClipListStore {
 			title: info.title ?? undefined,
 			start_time: info.startSec,
 			end_time: info.endSec,
-			file_url: info.blobUrl
+			file_url: info.blobUrl,
+			download_name: info.filename
 		};
 		this.clips = [clip, ...this.clips];
 	}
 
 	// ── 영상 추가 ───────────────────────────────────────────────────
 	// 전체 영상 다운로드 완료 시 목록 맨 앞에 삽입
-	addVideo(info: { title: string | null; url: string }) {
+	addVideo(info: { title: string | null; url: string; blobUrl: string; filename: string }) {
 		const video: Video = {
 			id: crypto.randomUUID(),
 			url: info.url,
 			status: 'completed',
-			title: info.title ?? undefined
+			title: info.title ?? undefined,
+			file_url: info.blobUrl,
+			download_name: info.filename
 		};
 		this.videos = [video, ...this.videos];
 	}

@@ -49,7 +49,7 @@
   {#if video.file_url && video.status === 'completed'}
     <div class="clip-actions">
       <button class="preview-card-btn" onclick={() => onPreview(video.file_url!)}>미리보기</button>
-      <a class="download-btn" href={localUrl(video.file_url)} download>다운로드</a>
+      <a class="download-btn" href={localUrl(video.file_url)} download={video.download_name}>다운로드</a>
     </div>
   {/if}
   {#if video.error_message}<p class="clip-error">{video.error_message}</p>{/if}
