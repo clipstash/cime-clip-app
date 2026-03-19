@@ -62,7 +62,6 @@ src/
 │   └── stream/proxy/+server.ts    # GET /stream/proxy — CORS 프록시
 ├── lib/
 │   ├── api/
-│   │   ├── config.ts              # API_URL 기본 경로 (/api/v1)
 │   │   ├── clips.ts               # 클립 타입 및 fetchClipInfo()
 │   │   ├── videos.ts              # 영상 타입
 │   │   └── record.ts              # 녹화 타입
