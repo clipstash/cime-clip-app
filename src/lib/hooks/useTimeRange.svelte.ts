@@ -34,14 +34,17 @@ export function useTimeRange(
 	);
 
 	// 시간 범위 유효성 검증 메시지 (null이면 정상)
+	// duration 미로드 또는 start=end=0이면 검증 생략
 	const timeError = $derived(
-		endSec <= startSec
-			? '종료 시간이 시작 시간보다 늦어야 합니다'
-			: clipDuration < 1
-				? '클립 길이는 최소 1초 이상이어야 합니다'
-				: getDurationLoaded() && endSec > getTotalSec()
-					? '종료 시간이 영상 길이를 초과합니다'
-					: null
+		!getDurationLoaded() || (startSec === 0 && endSec === 0)
+			? null
+			: endSec <= startSec
+				? '종료 시간이 시작 시간보다 늦어야 합니다'
+				: clipDuration < 1
+					? '클립 길이는 최소 1초 이상이어야 합니다'
+					: endSec > getTotalSec()
+						? '종료 시간이 영상 길이를 초과합니다'
+						: null
 	);
 
 	// ── 필드 맵 ──────────────────────────────────────────────────────
@@ -131,8 +134,9 @@ export function useTimeRange(
 		return `${m}:${String(s).padStart(2, '0')}`;
 	}
 
-	// ── url 변경 시 시간 초기화 ───────────────────────────────────────
-	// 새로운 스트림 URL이 입력되면 시작/종료 시간을 0으로 리셋
+	// ── url 변경 시 시작/종료 시간 초기화 ───────────────────────────
+	// 새 URL 입력 시 start/end 모두 0:0:0으로 리셋
+	// (duration 로드 후에도 자동 설정 없이 사용자가 직접 구간 설정)
 	$effect(() => {
 		void getUrl();
 		startH = 0;
@@ -141,13 +145,6 @@ export function useTimeRange(
 		endH = 0;
 		endM = 0;
 		endS = 0;
-	});
-
-	// ── 영상 길이 로드 시 종료 시간 자동 설정 ────────────────────────
-	// durationLoaded가 true가 되면 종료 시간을 영상 전체 길이로 설정
-	$effect(() => {
-		if (!getDurationLoaded() || getTotalSec() <= 0) return;
-		setFromSec('end', getTotalSec());
 	});
 
 	// ── 반환 객체 (반응형 getter/setter 노출) ────────────────────────
