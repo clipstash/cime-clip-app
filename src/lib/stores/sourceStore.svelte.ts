@@ -45,7 +45,9 @@ class SourceStore {
 					}
 					this.title = info.title;
 					this.streamer = info.streamer;
-					this.thumbnail = info.thumbnail;
+					this.thumbnail = info.thumbnail
+						? `/stream/proxy?url=${encodeURIComponent(info.thumbnail)}`
+						: null;
 					this.isLive = info.is_live;
 					if (info.duration != null) {
 						this.totalSec = info.duration;
