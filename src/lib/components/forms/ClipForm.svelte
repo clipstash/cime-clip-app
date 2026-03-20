@@ -66,7 +66,7 @@
 
 	// 생성 예정 파일 목록 (클립 파트)
 	const previewFiles = $derived.by(() => {
-		if (!durationLoaded) return [];
+		if (!durationLoaded || tr.timeError || (tr.startSec === 0 && tr.endSec === 0)) return [];
 		const baseName = makeBaseName(title, streamer);
 		const files: { filename: string; timeLabel: string }[] = [];
 		const clipCount = Math.ceil(tr.clipDuration / MAX_CLIP_SEC);
