@@ -44,7 +44,8 @@ export const GET: RequestHandler = async ({ url }) => {
 		status: 200,
 		headers: {
 			'content-type': contentType,
-			'cache-control': 'no-store'
+			'cache-control': 'no-store',
+			'cross-origin-resource-policy': 'cross-origin'
 		}
 	});
 };
