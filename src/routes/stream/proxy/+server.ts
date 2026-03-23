@@ -8,15 +8,10 @@ import { dev } from '$app/environment';
 // GET /stream/proxy?url=<외부_URL>
 //
 // ※ 대역폭 절감 정책:
-//   - m3u8 플레이리스트(텍스트, 소용량) → 서버에서 직접 중계
 //   - 영상 세그먼트(대용량 바이너리) → CDN으로 307 리다이렉트
 //     Amazon IVS CDN은 Access-Control-Allow-Origin: * 를 지원하므로
 //     클라이언트가 CDN에서 직접 받아도 CORS 에러 없음 → Vercel 트래픽 절감
-
-function isPlaylistUrl(targetUrl: string): boolean {
-	const pathname = targetUrl.split('?')[0].toLowerCase();
-	return pathname.endsWith('.m3u8');
-}
+//   - m3u8 플레이리스트·썸네일 등 나머지 → 서버에서 직접 중계
 
 export const GET: RequestHandler = async ({ url }) => {
 	const targetUrl = url.searchParams.get('url');

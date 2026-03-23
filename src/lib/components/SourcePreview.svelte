@@ -26,7 +26,7 @@
     </div>
   {:else}
     {#if sourceThumbnail}
-      <img src={sourceThumbnail} alt="" class="inline-preview-thumb" />
+      <img src={sourceThumbnail} alt="" class="inline-preview-thumb" onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
     {/if}
     <div class="source-info" class:on-thumb={!!sourceThumbnail}>
       <div class="source-info-left">

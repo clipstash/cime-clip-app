@@ -8,5 +8,4 @@ export type Video = {
   file_url?: string;
   error_message?: string;
   download_name?: string;
-  [key: string]: unknown;
 };
