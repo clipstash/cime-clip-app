@@ -1,0 +1,11 @@
+name = "cime-clip-proxy"
+main = "index.js"
+compatibility_date = "2024-09-23"
+
+# 배포 후 할당되는 주소 예시:
+#   https://cime-clip-proxy.<account>.workers.dev
+#
+# 커스텀 도메인 연결:
+# [[routes]]
+# pattern = "proxy.your-domain.com/*"
+# zone_name = "your-domain.com"

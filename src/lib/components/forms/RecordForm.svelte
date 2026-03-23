@@ -134,9 +134,10 @@
     if (pollTimerId) { clearTimeout(pollTimerId); pollTimerId = null; }
     if (segments.length === 0) { err = '녹화된 세그먼트가 없습니다. 잠시 후 다시 시도하세요.'; status = 'error'; return; }
 
+    let ffmpeg: Awaited<ReturnType<typeof loadFfmpeg>> | null = null;
     try {
       status = 'encoding';
-      const ffmpeg = await loadFfmpeg();
+      ffmpeg = await loadFfmpeg();
 
       // init + 모든 미디어 세그먼트를 하나의 바이너리로 병합 (fMP4 방식)
       // concat demuxer 대신 단일 파일로 합치면 ftyp/moov 박스 중복 문제가 없음
@@ -167,6 +168,8 @@
     } catch (e) {
       err = e instanceof Error ? e.message : String(e);
       status = 'error';
+    } finally {
+      ffmpeg?.terminate();
     }
   }
 
