@@ -50,10 +50,10 @@ export function useTimeRange(
 	// ── 필드 맵 ──────────────────────────────────────────────────────
 	// 필드명 → getter/setter/최댓값 매핑 (clampField, step에서 사용)
 	const fieldMap: Record<string, { get: () => number; set: (v: number) => void; max: number }> = {
-		startH: { get: () => startH, set: (v) => (startH = v), max: Infinity },
+		startH: { get: () => startH, set: (v) => (startH = v), max: 999 },
 		startM: { get: () => startM, set: (v) => (startM = v), max: 59 },
 		startS: { get: () => startS, set: (v) => (startS = v), max: 59 },
-		endH: { get: () => endH, set: (v) => (endH = v), max: Infinity },
+		endH: { get: () => endH, set: (v) => (endH = v), max: 999 },
 		endM: { get: () => endM, set: (v) => (endM = v), max: 59 },
 		endS: { get: () => endS, set: (v) => (endS = v), max: 59 }
 	};
@@ -77,10 +77,10 @@ export function useTimeRange(
 	}
 
 	// ── 필드 값 범위 클램프 ───────────────────────────────────────────
-	// 분/초 필드가 max(59)를 초과하지 않도록 보정 (시 필드는 무제한)
+	// 각 필드가 max를 초과하지 않도록 보정
 	function clampField(key: string) {
 		const field = fieldMap[key];
-		if (!field || field.max === Infinity) return;
+		if (!field) return;
 		field.set(Math.max(0, Math.min(field.max, field.get())));
 	}
 

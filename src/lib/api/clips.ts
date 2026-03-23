@@ -21,9 +21,9 @@ export type ClipInfo = {
   is_live: boolean; // 백엔드가 명시적으로 라이브 여부를 알려주는 필드
 };
 
-export async function fetchClipInfo(url: string): Promise<ClipInfo | null> {
+export async function fetchClipInfo(url: string, signal?: AbortSignal): Promise<ClipInfo | null> {
   try {
-    const res = await fetch(`/clips/info?url=${encodeURIComponent(url)}`);
+    const res = await fetch(`/clips/info?url=${encodeURIComponent(url)}`, { signal });
     if (!res.ok) return null;
     const data = await res.json();
     const raw = data.duration;

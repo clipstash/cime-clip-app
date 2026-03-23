@@ -1,8 +1,10 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import { loadFfmpeg } from '$lib/ffmpeg';
   import { fetchClipInfo } from '$lib/api/clips';
   import { parseM3u8 } from '$lib/utils/stream';
+  import { proxyUrl } from '$lib/utils/proxy';
 
 
   // ── Props 타입 ───────────────────────────────────────────────────
@@ -53,8 +55,7 @@
 
   // ── 세그먼트 프록시 fetch ────────────────────────────────────────
   async function fetchSegment(segUrl: string): Promise<Uint8Array> {
-    const proxyUrl = `/stream/proxy?url=${encodeURIComponent(segUrl)}`;
-    const res = await fetch(proxyUrl);
+    const res = await fetch(proxyUrl(segUrl));
     const buf = await res.arrayBuffer();
     return new Uint8Array(buf);
   }
@@ -187,6 +188,11 @@
 
   // 녹화 진행 중 여부 (일시멈춤 포함)
   const isActive = $derived(status === 'recording' || status === 'paused');
+
+  // 컴포넌트 unmount 시 폴링 타이머 정리 (페이지 이동 중 백그라운드 polling 방지)
+  onDestroy(() => {
+    if (pollTimerId) { clearTimeout(pollTimerId); pollTimerId = null; }
+  });
 </script>
 
 <div class="form-row record-row">
