@@ -1,7 +1,7 @@
 <script lang="ts">
   import ProgressBar from '../ui/ProgressBar.svelte';
 
-  let { files, title, streamer, thumbnail, busy = false, progress = 0, progressLabel = '' }: {
+  let { files, title, streamer, thumbnail, busy = false, progress = 0, progressLabel = '', currentFileIdx = 0 }: {
     files: { filename: string; timeLabel: string }[];
     title: string | null;
     streamer: string | null;
@@ -9,11 +9,12 @@
     busy?: boolean;
     progress?: number;
     progressLabel?: string;
+    currentFileIdx?: number;
   } = $props();
 </script>
 
-{#each files as f}
-<div class="clip-card preview-card" class:processing={busy}>
+{#each files as f, idx}
+<div class="clip-card preview-card" class:processing={busy && idx === currentFileIdx}>
   {#if thumbnail}
     <div class="clip-thumb preview-thumb">
       <img src={thumbnail} alt="썸네일" />
@@ -23,7 +24,7 @@
   <div class="clip-header">
     <div class="clip-header-left">
       <span class="platform">CLIP</span>
-      <span class="status" style="color: {busy ? '#f5a623' : '#555'}">{busy ? '처리 중' : '생성 예정'}</span>
+      <span class="status" style="color: {busy && idx === currentFileIdx ? '#f5a623' : '#555'}">{busy && idx === currentFileIdx ? '처리 중' : busy ? '대기 중' : '생성 예정'}</span>
     </div>
   </div>
   <p class="clip-title">{title ?? f.filename}</p>
@@ -31,7 +32,7 @@
   <div class="clip-meta">
     <span>{f.filename}</span>
   </div>
-  {#if busy}
+  {#if busy && idx === currentFileIdx}
     <div class="preview-progress">
       <ProgressBar {progress} label={progressLabel} />
     </div>

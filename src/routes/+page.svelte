@@ -72,6 +72,7 @@
       busy={clipListStore.preview.busy}
       progress={clipListStore.preview.progress}
       progressLabel={clipListStore.preview.progressLabel}
+      currentFileIdx={clipListStore.preview.currentFileIdx}
     />
   </div>
 </section>

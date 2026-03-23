@@ -52,6 +52,7 @@
 	let dlStatus = $state<DlStatus>('idle');
 	let progress = $state(0);
 	let progressLabel = $state('');
+	let currentFileIdx = $state(0);
 
 	// 처리 중 여부 (버튼 비활성화 등에 사용)
 	const busy = $derived(
@@ -97,7 +98,8 @@
 			thumbnail,
 			busy,
 			progress,
-			progressLabel
+			progressLabel,
+			currentFileIdx
 		});
 		return () => clipListStore.setPreview(null);
 	});
@@ -190,6 +192,7 @@
 				const chunkDur = Math.min(MAX_CLIP_SEC, tr.endSec - chunkStart);
 				const outFile = `output_${i}.mp4`;
 
+				currentFileIdx = i;
 				progressLabel = numParts > 1
 					? `파트 ${i + 1}/${numParts} 인코딩 중...`
 					: 'MP4 변환 중...';

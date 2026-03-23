@@ -23,6 +23,7 @@ class ClipListStore {
 		busy: boolean;
 		progress: number;
 		progressLabel: string;
+		currentFileIdx: number;
 	} | null>(null);
 
 	setPreview(
@@ -34,6 +35,7 @@ class ClipListStore {
 			busy: boolean;
 			progress: number;
 			progressLabel: string;
+			currentFileIdx: number;
 		} | null
 	) {
 		this.preview = data;
