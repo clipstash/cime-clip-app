@@ -18,6 +18,12 @@ function isPlaylistUrl(url: string): boolean {
 	return path.endsWith('.m3u8') || path.endsWith('.m3u');
 }
 
+function isMediaSegment(targetUrl: string): boolean {
+	const pathname = targetUrl.split('?')[0].toLowerCase();
+	return pathname.endsWith('.ts') || pathname.endsWith('.m4s') ||
+		pathname.endsWith('.cmfv') || pathname.endsWith('.cmfa');
+}
+
 export const GET: RequestHandler = async ({ url }) => {
 	const targetUrl = url.searchParams.get('url');
 	if (!targetUrl) {
