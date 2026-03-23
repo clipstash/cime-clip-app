@@ -22,7 +22,9 @@ export default defineConfig(
 		rules: {
 			// typescript-eslint strongly recommend that you do not use the no-undef lint rule on TypeScript projects.
 			// see: https://typescript-eslint.io/troubleshooting/faqs/eslint/#i-get-errors-from-the-no-undef-rule-about-global-variables-not-being-defined-even-though-there-are-no-typescript-errors
-			'no-undef': 'off'
+			'no-undef': 'off',
+			// 다운로드 링크(blob: URL, 로컬 파일 경로)에는 SvelteKit resolve()가 적용되지 않음
+			'svelte/no-navigation-without-resolve': 'off'
 		}
 	},
 	{

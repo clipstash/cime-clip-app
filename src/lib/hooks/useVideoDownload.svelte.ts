@@ -64,7 +64,6 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 			// 4. FFmpeg 로드
 			ffmpeg = await loadFfmpeg();
 			status = 'downloading';
-			const segNames: string[] = [];
 
 			// 5. 초기화 세그먼트(init) 다운로드 (fMP4 포맷일 때 필요)
 			let initData: Uint8Array | null = null;
@@ -72,8 +71,8 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 				initData = await fetchFile(proxyUrl(initUrl));
 			}
 
-			// 6. 전체 세그먼트 순차 다운로드 (취소/일시정지 요청 시 처리)
-			//    fMP4이면 initData를 각 세그먼트 앞에 붙여 독립 재생 가능하게 처리
+			// 6. 전체 세그먼트 순차 다운로드 → 메모리에 보관
+			const segDatas: Uint8Array[] = [];
 			for (let i = 0; i < segments.length; i++) {
 				// 일시정지 대기 — 취소되면 즉시 탈출
 				while (pauseRequested && !cancelRequested) {
@@ -85,17 +84,7 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 					progressLabel = '';
 					return;
 				}
-				const segData = await fetchFile(proxyUrl(segments[i]));
-				const name = `seg${String(i).padStart(5, '0')}.mp4`;
-				if (initData) {
-					const combined = new Uint8Array(initData.byteLength + segData.byteLength);
-					combined.set(initData, 0);
-					combined.set(segData, initData.byteLength);
-					await ffmpeg.writeFile(name, combined);
-				} else {
-					await ffmpeg.writeFile(name, segData);
-				}
-				segNames.push(name);
+				segDatas.push(await fetchFile(proxyUrl(segments[i])));
 				progress = Math.round(((i + 1) / segments.length) * 80);
 				progressLabel = `${i + 1} / ${segments.length} 세그먼트`;
 			}
@@ -106,22 +95,29 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 				return;
 			}
 
-			// 7. 파트별 FFmpeg concat (스트림 복사) → 파트별 onSuccess 콜백
+			// 7. 파트별 FFmpeg 인코딩 (스트림 복사) → 파트별 onSuccess 콜백
+			//    fMP4: init + 파트 세그먼트를 단일 바이너리로 합쳐 입력 (moov 중복 방지)
 			status = 'encoding';
 			const numParts = partGroups.length;
 			const baseName = (info.title ?? 'video').replace(/[\\/:*?"<>|]/g, '_');
 
 			for (let p = 0; p < numParts; p++) {
+				const inputFile = `input_${p}.mp4`;
 				const outFile = `output_${p}.mp4`;
 				progressLabel = numParts > 1
 					? `파트 ${p + 1}/${numParts} 인코딩 중...`
 					: 'MP4 변환 중...';
 				progress = 82 + Math.round((p / numParts) * 14);
 
-				const concatList = partGroups[p].map((i) => `file '${segNames[i]}'`).join('\n');
-				await ffmpeg.writeFile('concat.txt', concatList);
-				await ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', 'concat.txt', '-c', 'copy', outFile]);
-				await ffmpeg.deleteFile('concat.txt');
+				const partSegs = partGroups[p].map((i) => segDatas[i]);
+				const parts: Uint8Array[] = initData ? [initData, ...partSegs] : partSegs;
+				const totalBytes = parts.reduce((a, b) => a + b.byteLength, 0);
+				const combined = new Uint8Array(totalBytes);
+				let byteOffset = 0;
+				for (const part of parts) { combined.set(part, byteOffset); byteOffset += part.byteLength; }
+				await ffmpeg.writeFile(inputFile, combined);
+				await ffmpeg.exec(['-i', inputFile, '-c', 'copy', '-movflags', '+faststart', outFile]);
+				await ffmpeg.deleteFile(inputFile);
 
 				const raw = (await ffmpeg.readFile(outFile)) as Uint8Array;
 				const buf = new ArrayBuffer(raw.byteLength);
@@ -133,10 +129,7 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 				await ffmpeg.deleteFile(outFile);
 			}
 
-			// 8. FFmpeg 세그먼트 파일 정리
-			for (const name of segNames) await ffmpeg.deleteFile(name);
-
-			// 9. 완료 처리
+			// 8. 완료 처리
 			progress = 100;
 			progressLabel = '완료!';
 			status = 'idle';

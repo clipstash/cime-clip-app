@@ -13,7 +13,7 @@
   } = $props();
 </script>
 
-{#each files as f, idx}
+{#each files as f, idx (f.filename)}
 <div class="clip-card preview-card" class:processing={busy && idx === currentFileIdx}>
   {#if thumbnail}
     <div class="clip-thumb preview-thumb">

@@ -13,12 +13,9 @@ import { dev } from '$app/environment';
 //     클라이언트가 CDN에서 직접 받아도 CORS 에러 없음 → Vercel 트래픽 절감
 //   - m3u8 플레이리스트·썸네일 등 나머지 → 서버에서 직접 중계
 
-// 스트림 미디어 세그먼트 여부 판별 (.ts / .m4s / fMP4 세그먼트)
-// 썸네일 이미지 등은 해당 없으므로 프록시로 정상 처리
-function isMediaSegment(targetUrl: string): boolean {
-	const pathname = targetUrl.split('?')[0].toLowerCase();
-	return pathname.endsWith('.ts') || pathname.endsWith('.m4s') ||
-		pathname.endsWith('.cmfv') || pathname.endsWith('.cmfa');
+function isPlaylistUrl(url: string): boolean {
+	const path = url.split('?')[0];
+	return path.endsWith('.m3u8') || path.endsWith('.m3u');
 }
 
 export const GET: RequestHandler = async ({ url }) => {
