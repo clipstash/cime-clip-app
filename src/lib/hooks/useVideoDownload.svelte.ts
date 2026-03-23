@@ -5,6 +5,7 @@ import { loadFfmpeg } from '$lib/ffmpeg';
 // ── API / 유틸 ───────────────────────────────────────────────────
 import { fetchClipInfo } from '$lib/api/clips';
 import { parseM3u8 } from '$lib/utils/stream';
+import { proxyUrl } from '$lib/utils/proxy';
 
 // ── 상태 타입 ────────────────────────────────────────────────────
 type DlStatus = 'idle' | 'loading' | 'downloading' | 'encoding' | 'error';
@@ -23,6 +24,7 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 
 	// ── 내부 변수 (반응형 불필요) ─────────────────────────────────────
 	let cancelRequested = false; // 취소 요청 플래그 (다음 세그먼트 루프에서 확인)
+	let pauseRequested = $state(false); // 일시정지 요청 플래그
 
 	// 다운로드/인코딩 진행 중 여부 (버튼 비활성화 등에 사용)
 	const busy = $derived(status === 'loading' || status === 'downloading' || status === 'encoding');
@@ -31,10 +33,12 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 	async function download(url: string) {
 		if (!url || status !== 'idle') return;
 		cancelRequested = false;
+		pauseRequested = false;
 		status = 'loading';
 		err = '';
 		progress = 0;
 
+		let ffmpeg: Awaited<ReturnType<typeof loadFfmpeg>> | null = null;
 		try {
 			// 1. 스트림 정보 조회 및 m3u8 URL 확인
 			const info = await fetchClipInfo(url);
@@ -58,26 +62,30 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 			}
 
 			// 4. FFmpeg 로드
-			const ffmpeg = await loadFfmpeg();
+			ffmpeg = await loadFfmpeg();
 			status = 'downloading';
 			const segNames: string[] = [];
 
 			// 5. 초기화 세그먼트(init) 다운로드 (fMP4 포맷일 때 필요)
 			let initData: Uint8Array | null = null;
 			if (initUrl) {
-				initData = await fetchFile(`/stream/proxy?url=${encodeURIComponent(initUrl)}`);
+				initData = await fetchFile(proxyUrl(initUrl));
 			}
 
-			// 6. 전체 세그먼트 순차 다운로드 (취소 요청 시 중단)
+			// 6. 전체 세그먼트 순차 다운로드 (취소/일시정지 요청 시 처리)
 			//    fMP4이면 initData를 각 세그먼트 앞에 붙여 독립 재생 가능하게 처리
 			for (let i = 0; i < segments.length; i++) {
+				// 일시정지 대기 — 취소되면 즉시 탈출
+				while (pauseRequested && !cancelRequested) {
+					await new Promise<void>((r) => setTimeout(r, 200));
+				}
 				if (cancelRequested) {
 					status = 'idle';
 					progress = 0;
 					progressLabel = '';
 					return;
 				}
-				const segData = await fetchFile(`/stream/proxy?url=${encodeURIComponent(segments[i])}`);
+				const segData = await fetchFile(proxyUrl(segments[i]));
 				const name = `seg${String(i).padStart(5, '0')}.mp4`;
 				if (initData) {
 					const combined = new Uint8Array(initData.byteLength + segData.byteLength);
@@ -135,13 +143,23 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 		} catch (e) {
 			err = e instanceof Error ? e.message : String(e);
 			status = 'error';
+		} finally {
+			ffmpeg?.terminate();
 		}
 	}
 
-	// ── 다운로드 취소 ─────────────────────────────────────────────────
-	// 다음 세그먼트 루프 진입 시 cancelRequested를 확인해 중단
+	// ── 다운로드 취소/일시정지/재개 ──────────────────────────────────
 	function cancel() {
 		cancelRequested = true;
+		pauseRequested = false;
+	}
+
+	function pause() {
+		pauseRequested = true;
+	}
+
+	function resume() {
+		pauseRequested = false;
 	}
 
 	// ── 반환 객체 (반응형 getter 노출) ───────────────────────────────
@@ -161,7 +179,12 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 		get busy() {
 			return busy;
 		},
+		get isPaused() {
+			return pauseRequested;
+		},
 		download,
-		cancel
+		cancel,
+		pause,
+		resume
 	};
 }

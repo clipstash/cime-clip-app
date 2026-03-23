@@ -3,6 +3,7 @@
 	import { loadFfmpeg } from '$lib/ffmpeg';
 	import { fetchClipInfo } from '$lib/api/clips';
 	import { parseM3u8 } from '$lib/utils/stream';
+	import { proxyUrl } from '$lib/utils/proxy';
 	import { useTimeRange } from '$lib/hooks/useTimeRange.svelte';
 	import { useVideoDownload } from '$lib/hooks/useVideoDownload.svelte';
 	import { clipListStore } from '$lib/stores/clipListStore.svelte';
@@ -47,6 +48,7 @@
 
 	let err = $state('');
 	let cancelClipRequested = $state(false);
+	let pauseClipRequested = $state(false);
 	let dlStatus = $state<DlStatus>('idle');
 	let progress = $state(0);
 	let progressLabel = $state('');
@@ -105,10 +107,12 @@
 		if (!url || dlStatus !== 'idle' || !!tr.timeError) return;
 
 		cancelClipRequested = false;
+		pauseClipRequested = false;
 		dlStatus = 'loading';
 		err = '';
 		progress = 0;
 
+		let ffmpeg: Awaited<ReturnType<typeof loadFfmpeg>> | null = null;
 		try {
 			// 1. 스트림 정보 조회 및 m3u8 URL 확인
 			const info = await fetchClipInfo(url);
@@ -130,29 +134,29 @@
 			if (selectedIdxs.length === 0) throw new Error('지정한 구간이 현재 스트림 범위를 벗어납니다');
 
 			// 4. FFmpeg 로드
-			const ffmpeg = await loadFfmpeg();
+			ffmpeg = await loadFfmpeg();
 			dlStatus = 'downloading';
 
 			// 5. 초기화 세그먼트(init) 다운로드 (fMP4 포맷일 때 필요)
 			let initData: Uint8Array | null = null;
 			if (initUrl) {
-				initData = await fetchFile(`/stream/proxy?url=${encodeURIComponent(initUrl)}`);
+				initData = await fetchFile(proxyUrl(initUrl));
 			}
 
-			// 6. 선택된 세그먼트 순차 다운로드 (취소 요청 시 중단)
+			// 6. 선택된 세그먼트 순차 다운로드 (취소/일시정지 요청 시 처리)
 			const segParts: Uint8Array[] = [];
 			for (let idx = 0; idx < selectedIdxs.length; idx++) {
+				// 일시정지 대기 — 취소되면 즉시 탈출
+				while (pauseClipRequested && !cancelClipRequested) {
+					await new Promise<void>((r) => setTimeout(r, 200));
+				}
 				if (cancelClipRequested) {
 					dlStatus = 'idle';
 					progress = 0;
 					progressLabel = '';
 					return;
 				}
-				segParts.push(
-					await fetchFile(
-						`/stream/proxy?url=${encodeURIComponent(segments[selectedIdxs[idx]])}`
-					)
-				);
+				segParts.push(await fetchFile(proxyUrl(segments[selectedIdxs[idx]])));
 				progress = Math.round(((idx + 1) / selectedIdxs.length) * 80);
 				progressLabel = `${idx + 1} / ${selectedIdxs.length} 세그먼트`;
 			}
@@ -218,6 +222,8 @@
 		} catch (e) {
 			err = e instanceof Error ? e.message : String(e);
 			dlStatus = 'error';
+		} finally {
+			ffmpeg?.terminate();
 		}
 	}
 </script>
@@ -275,7 +281,14 @@
 	<!-- 클립 생성 버튼 -->
 	{#if busy}
 		<button class="submit-btn" disabled>처리중...</button>
-		<button class="cancel-btn" onclick={() => (cancelClipRequested = true)}>취소 ✕</button>
+		{#if dlStatus === 'downloading'}
+			{#if pauseClipRequested}
+				<button class="cancel-btn" onclick={() => (pauseClipRequested = false)}>재개 ▶</button>
+			{:else}
+				<button class="cancel-btn" onclick={() => (pauseClipRequested = true)}>일시정지 ⏸</button>
+			{/if}
+		{/if}
+		<button class="cancel-btn" onclick={() => { cancelClipRequested = true; pauseClipRequested = false; }}>취소 ✕</button>
 	{:else}
 		<button class="submit-btn" onclick={submit} disabled={!url || !!tr.timeError}>클립 생성 ✦</button>
 	{/if}
@@ -283,6 +296,13 @@
 	<!-- 전체 영상 다운로드 버튼 -->
 	{#if videoDl.busy}
 		<button class="submit-btn" disabled>처리중...</button>
+		{#if videoDl.status === 'downloading'}
+			{#if videoDl.isPaused}
+				<button class="cancel-btn" onclick={videoDl.resume}>재개 ▶</button>
+			{:else}
+				<button class="cancel-btn" onclick={videoDl.pause}>일시정지 ⏸</button>
+			{/if}
+		{/if}
 		<button class="cancel-btn" onclick={videoDl.cancel}>취소 ✕</button>
 	{:else}
 		<button class="submit-btn" onclick={() => videoDl.download(url)} disabled={!url}>전체 다운로드 ✦</button>
