@@ -18,6 +18,14 @@ function isPlaylistUrl(targetUrl: string): boolean {
 	return pathname.endsWith('.m3u8');
 }
 
+// 스트림 미디어 세그먼트 여부 판별 (.ts / .m4s / fMP4 세그먼트)
+// 썸네일 이미지 등은 해당 없으므로 프록시로 정상 처리
+function isMediaSegment(targetUrl: string): boolean {
+	const pathname = targetUrl.split('?')[0].toLowerCase();
+	return pathname.endsWith('.ts') || pathname.endsWith('.m4s') ||
+		pathname.endsWith('.cmfv') || pathname.endsWith('.cmfa');
+}
+
 export const GET: RequestHandler = async ({ url }) => {
 	const targetUrl = url.searchParams.get('url');
 	if (!targetUrl) {
@@ -25,8 +33,9 @@ export const GET: RequestHandler = async ({ url }) => {
 	}
 
 	// 세그먼트 요청: CDN으로 직접 리다이렉트 (Vercel 대역폭 절감)
-	// 개발 환경에서는 CDN이 localhost CORS를 허용하지 않을 수 있어 직접 프록시
-	if (!dev && !isPlaylistUrl(targetUrl)) {
+	// - m3u8 플레이리스트, 썸네일 이미지 등은 제외하고 프록시로 처리
+	// - 개발 환경에서는 CDN이 localhost CORS를 허용하지 않을 수 있어 직접 프록시
+	if (!dev && isMediaSegment(targetUrl)) {
 		return new Response(null, {
 			status: 307,
 			headers: { 'Location': targetUrl }
