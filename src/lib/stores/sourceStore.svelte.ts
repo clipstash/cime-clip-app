@@ -32,14 +32,16 @@ class SourceStore {
 
 			// url 변경 후 600ms 디바운스 → 스트림 정보 자동 조회
 			// duration이 있으면 VOD(totalSec 갱신), 없으면 라이브로 판단
+			// AbortController로 이전 진행 중인 요청을 취소해 경쟁 조건 방지
 			$effect(() => {
 				const targetUrl = this.url;
 				if (!targetUrl) return;
 				this.loading = true;
+				const controller = new AbortController();
 				const t = setTimeout(async () => {
-					const info = await fetchClipInfo(targetUrl);
+					const info = await fetchClipInfo(targetUrl, controller.signal);
 					if (!info) {
-						// API 오류: 라이브 여부 판단 불가 → isLive 변경 없이 로딩 종료
+						// API 오류 또는 요청 취소: 로딩 종료
 						this.loading = false;
 						return;
 					}
@@ -55,7 +57,10 @@ class SourceStore {
 					}
 					this.loading = false;
 				}, 600);
-				return () => clearTimeout(t);
+				return () => {
+					clearTimeout(t);
+					controller.abort();
+				};
 			});
 		});
 	}
