@@ -1,3 +1,5 @@
+import { proxyUrl } from '$lib/utils/proxy';
+
 // ── m3u8 파싱 결과 타입 ───────────────────────────────────────────
 export type M3u8Info = {
 	initUrl: string | null; // fMP4 초기화 세그먼트 URL (없으면 null)
@@ -9,8 +11,8 @@ export type M3u8Info = {
 // 프록시를 통해 m3u8을 가져온 뒤 세그먼트 목록과 init URL을 추출
 // 마스터 플레이리스트인 경우 첫 번째 서브 플레이리스트를 재귀 파싱
 export async function parseM3u8(m3u8Url: string): Promise<M3u8Info> {
-	const proxyUrl = `/stream/proxy?url=${encodeURIComponent(m3u8Url)}`;
-	const res = await fetch(proxyUrl);
+	const fetchUrl = proxyUrl(m3u8Url);
+	const res = await fetch(fetchUrl);
   
 	if (!res.ok) {
 		const msg = await res.text().catch(() => res.statusText);
