@@ -1,20 +1,14 @@
-// ── 외부 라이브러리 ──────────────────────────────────────────────
-import { fetchFile } from '@ffmpeg/util';
-import { loadFfmpeg } from '$lib/ffmpeg';
-
 // ── API / 유틸 ───────────────────────────────────────────────────
 import { fetchClipInfo } from '$lib/api/clips';
 import { parseM3u8 } from '$lib/utils/stream';
 import { proxyUrl } from '$lib/utils/proxy';
 
 // ── 상태 타입 ────────────────────────────────────────────────────
-type DlStatus = 'idle' | 'loading' | 'downloading' | 'encoding' | 'error';
-
-const MAX_CLIP_SEC = 3600; // 60분 최대 파트 길이
+type DlStatus = 'idle' | 'loading' | 'downloading' | 'error';
 
 // ── 전체 영상 다운로드 훅 ─────────────────────────────────────────
-// m3u8 → 전체 세그먼트 다운로드 → FFmpeg concat → 파트별 onSuccess 콜백
-// 60분 초과 시 파트별 분할
+// m3u8 → 세그먼트 스트리밍 → File System Access API로 디스크에 직접 저장
+// FFmpeg 불필요 — 세그먼트를 메모리에 누적하지 않으므로 대용량 영상도 안전
 export function useVideoDownload(onSuccess?: (info: { title: string | null; url: string; blobUrl: string; filename: string }) => void) {
 	// ── 반응형 상태 ──────────────────────────────────────────────────
 	let status = $state<DlStatus>('idle');
@@ -23,121 +17,110 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 	let err = $state(''); // 에러 메시지
 
 	// ── 내부 변수 (반응형 불필요) ─────────────────────────────────────
-	let cancelRequested = false; // 취소 요청 플래그 (다음 세그먼트 루프에서 확인)
-	let pauseRequested = $state(false); // 일시정지 요청 플래그
+	let cancelRequested = false;
+	let pauseRequested = $state(false);
 
-	// 다운로드/인코딩 진행 중 여부 (버튼 비활성화 등에 사용)
-	const busy = $derived(status === 'loading' || status === 'downloading' || status === 'encoding');
+	const busy = $derived(status === 'loading' || status === 'downloading');
 
 	// ── 전체 영상 다운로드 ────────────────────────────────────────────
-	async function download(url: string) {
+	// suggestedTitle: 파일 저장 대화상자에 표시할 기본 파일명 (ClipForm에서 전달)
+	async function download(url: string, suggestedTitle?: string | null) {
 		if (!url || status !== 'idle') return;
+
+		if (!('showSaveFilePicker' in window)) {
+			err = '이 브라우저는 스트리밍 다운로드를 지원하지 않습니다 (Chrome / Edge 권장)';
+			status = 'error';
+			return;
+		}
+
 		cancelRequested = false;
 		pauseRequested = false;
-		status = 'loading';
 		err = '';
 		progress = 0;
+		status = 'loading';
+		progressLabel = '정보 가져오는 중...';
 
-		let ffmpeg: Awaited<ReturnType<typeof loadFfmpeg>> | null = null;
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const fsp = window as any;
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		let writable: any;
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		let fileHandle: any;
+
 		try {
 			// 1. 스트림 정보 조회 및 m3u8 URL 확인
 			const info = await fetchClipInfo(url);
 			if (!info || !info.m3u8_url) throw new Error('스트림 URL을 찾을 수 없습니다');
 
-			// 2. m3u8 파싱 → 전체 세그먼트 목록 추출
-			const { initUrl, segments, durations } = await parseM3u8(info.m3u8_url);
+			// 2. m3u8 파싱 → 세그먼트 목록 추출
+			const { initUrl, segments } = await parseM3u8(info.m3u8_url);
 			if (segments.length === 0) throw new Error('세그먼트를 찾을 수 없습니다');
 
-			// 3. 세그먼트를 60분 단위 파트로 그룹화
-			const partGroups: number[][] = [[]];
-			let cumDur = 0;
-			for (let i = 0; i < segments.length; i++) {
-				const d = durations[i] || 2;
-				if (cumDur + d > MAX_CLIP_SEC && partGroups[partGroups.length - 1].length > 0) {
-					partGroups.push([]);
-					cumDur = 0;
-				}
-				partGroups[partGroups.length - 1].push(i);
-				cumDur += d;
-			}
+			// 3. 파일 저장 대화상자 — 사용자가 저장 위치 선택
+			//    fMP4(initUrl 있음) → .mp4 / MPEG-TS → .ts
+			const isFmp4 = initUrl !== null;
+			const baseName = ((suggestedTitle ?? info.title ?? 'video')).replace(/[\\/:*?"<>|]/g, '_');
+			const ext = isFmp4 ? '.mp4' : '.ts';
+			const mimeType = isFmp4 ? 'video/mp4' : 'video/mp2t';
 
-			// 4. FFmpeg 로드
-			ffmpeg = await loadFfmpeg();
+			fileHandle = await fsp.showSaveFilePicker({
+				suggestedName: `${baseName}${ext}`,
+				types: [{ description: 'Video', accept: { [mimeType]: [ext] } }]
+			});
+			writable = await fileHandle.createWritable();
+
 			status = 'downloading';
 
-			// 5. 초기화 세그먼트(init) 다운로드 (fMP4 포맷일 때 필요)
-			let initData: Uint8Array | null = null;
+			// 4. 초기화 세그먼트(init) 스트리밍 (fMP4 포맷일 때 필요)
 			if (initUrl) {
-				initData = await fetchFile(proxyUrl(initUrl));
+				progressLabel = '초기화 세그먼트...';
+				const res = await fetch(proxyUrl(initUrl));
+				if (!res.ok) throw new Error(`초기화 세그먼트 fetch 실패 (${res.status})`);
+				await writable.write(await res.arrayBuffer());
 			}
 
-			// 6. 전체 세그먼트 순차 다운로드 → 메모리에 보관
-			const segDatas: Uint8Array[] = [];
+			// 5. 미디어 세그먼트 순차 fetch → 디스크에 스트리밍 (메모리 누적 없음)
 			for (let i = 0; i < segments.length; i++) {
-				// 일시정지 대기 — 취소되면 즉시 탈출
+				// 일시정지 대기
 				while (pauseRequested && !cancelRequested) {
 					await new Promise<void>((r) => setTimeout(r, 200));
 				}
 				if (cancelRequested) {
+					await writable.abort();
 					status = 'idle';
 					progress = 0;
 					progressLabel = '';
 					return;
 				}
-				segDatas.push(await fetchFile(proxyUrl(segments[i])));
-				progress = Math.round(((i + 1) / segments.length) * 80);
+
+				const res = await fetch(proxyUrl(segments[i]));
+				if (!res.ok) throw new Error(`세그먼트 fetch 실패 (${res.status})`);
+				await writable.write(await res.arrayBuffer());
+
+				progress = Math.round(((i + 1) / segments.length) * 100);
 				progressLabel = `${i + 1} / ${segments.length} 세그먼트`;
 			}
-			if (cancelRequested) {
+
+			// 6. 완료 처리
+			await writable.close();
+			const filename = fileHandle?.name ?? `${baseName}${ext}`;
+			onSuccess?.({ title: info.title, url, blobUrl: '', filename });
+			progress = 100;
+			progressLabel = '완료!';
+			status = 'idle';
+		} catch (e) {
+			if (writable) {
+				try { await writable.abort(); } catch { /* ignore */ }
+			}
+			// 사용자가 저장 대화상자를 취소한 경우
+			if (e instanceof Error && e.name === 'AbortError') {
 				status = 'idle';
 				progress = 0;
 				progressLabel = '';
 				return;
 			}
-
-			// 7. 파트별 FFmpeg 인코딩 (스트림 복사) → 파트별 onSuccess 콜백
-			//    fMP4: init + 파트 세그먼트를 단일 바이너리로 합쳐 입력 (moov 중복 방지)
-			status = 'encoding';
-			const numParts = partGroups.length;
-			const baseName = (info.title ?? 'video').replace(/[\\/:*?"<>|]/g, '_');
-
-			for (let p = 0; p < numParts; p++) {
-				const inputFile = `input_${p}.mp4`;
-				const outFile = `output_${p}.mp4`;
-				progressLabel = numParts > 1
-					? `파트 ${p + 1}/${numParts} 인코딩 중...`
-					: 'MP4 변환 중...';
-				progress = 82 + Math.round((p / numParts) * 14);
-
-				const partSegs = partGroups[p].map((i) => segDatas[i]);
-				const parts: Uint8Array[] = initData ? [initData, ...partSegs] : partSegs;
-				const totalBytes = parts.reduce((a, b) => a + b.byteLength, 0);
-				const combined = new Uint8Array(totalBytes);
-				let byteOffset = 0;
-				for (const part of parts) { combined.set(part, byteOffset); byteOffset += part.byteLength; }
-				await ffmpeg.writeFile(inputFile, combined);
-				await ffmpeg.exec(['-i', inputFile, '-c', 'copy', '-movflags', '+faststart', outFile]);
-				await ffmpeg.deleteFile(inputFile);
-
-				const raw = (await ffmpeg.readFile(outFile)) as Uint8Array;
-				const buf = new ArrayBuffer(raw.byteLength);
-				new Uint8Array(buf).set(raw);
-				const blob = new Blob([buf], { type: 'video/mp4' });
-				const blobUrl = URL.createObjectURL(blob);
-				const filename = numParts > 1 ? `${baseName}_part${p + 1}.mp4` : `${baseName}.mp4`;
-				onSuccess?.({ title: info.title, url, blobUrl, filename });
-				await ffmpeg.deleteFile(outFile);
-			}
-
-			// 8. 완료 처리
-			progress = 100;
-			progressLabel = '완료!';
-			status = 'idle';
-		} catch (e) {
 			err = e instanceof Error ? e.message : String(e);
 			status = 'error';
-		} finally {
-			ffmpeg?.terminate();
 		}
 	}
 
@@ -157,25 +140,13 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 
 	// ── 반환 객체 (반응형 getter 노출) ───────────────────────────────
 	return {
-		get status() {
-			return status;
-		},
-		get progress() {
-			return progress;
-		},
-		get progressLabel() {
-			return progressLabel;
-		},
-		get err() {
-			return err;
-		},
-		get busy() {
-			return busy;
-		},
-		get isPaused() {
-			return pauseRequested;
-		},
-		download,
+		get status() { return status; },
+		get progress() { return progress; },
+		get progressLabel() { return progressLabel; },
+		get err() { return err; },
+		get busy() { return busy; },
+		get isPaused() { return pauseRequested; },
+		download: download as (url: string, suggestedTitle?: string | null) => Promise<void>,
 		cancel,
 		pause,
 		resume

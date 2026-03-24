@@ -41,6 +41,10 @@
 	// 전체 영상 다운로드 상태 관리
 	const videoDl = useVideoDownload((info) => onVideoSuccess(info));
 
+	// 전체 다운로드 파일명 (title 변경 시 자동 동기화, 사용자가 직접 수정 가능)
+	let videoFilename = $state('');
+	$effect(() => { videoFilename = title ?? ''; });
+
 	// ── 클립 다운로드 상태 ───────────────────────────────────────────
 	type DlStatus = 'idle' | 'loading' | 'downloading' | 'encoding' | 'error';
 
@@ -295,8 +299,17 @@
 	{:else}
 		<button class="submit-btn" onclick={submit} disabled={!url || !!tr.timeError}>클립 생성 ✦</button>
 	{/if}
+</div>
 
-	<!-- 전체 영상 다운로드 버튼 -->
+<!-- 전체 영상 다운로드 행 -->
+<div class="form-row video-dl-row">
+	<input
+		class="filename-input"
+		type="text"
+		bind:value={videoFilename}
+		placeholder="파일명 (확장자 제외)"
+		disabled={videoDl.busy}
+	/>
 	{#if videoDl.busy}
 		<button class="submit-btn" disabled>처리중...</button>
 		{#if videoDl.status === 'downloading'}
@@ -308,7 +321,7 @@
 		{/if}
 		<button class="cancel-btn" onclick={videoDl.cancel}>취소 ✕</button>
 	{:else}
-		<button class="submit-btn" onclick={() => videoDl.download(url)} disabled={!url}>전체 다운로드 ✦</button>
+		<button class="submit-btn" onclick={() => videoDl.download(url, videoFilename || title)} disabled={!url}>전체 다운로드 ✦</button>
 	{/if}
 </div>
 
