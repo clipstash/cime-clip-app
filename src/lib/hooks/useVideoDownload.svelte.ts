@@ -79,7 +79,20 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 				await writable.write(await res.arrayBuffer());
 			}
 
-			// 5. 미디어 세그먼트 순차 fetch → 디스크에 스트리밍 (메모리 누적 없음)
+			// 5. 미디어 세그먼트 병렬 fetch → 디스크에 순서대로 스트리밍 (메모리 누적 없음)
+			// CONCURRENCY개 선행 fetch로 대기 시간 단축, 쓰기는 순서 보장
+			const fetchBuf = (segUrl: string) =>
+				fetch(proxyUrl(segUrl)).then((r) => {
+					if (!r.ok) throw new Error(`세그먼트 fetch 실패 (${r.status})`);
+					return r.arrayBuffer();
+				});
+
+			const CONCURRENCY = 4;
+			const fetches: (Promise<ArrayBuffer> | null)[] = new Array(segments.length).fill(null);
+			for (let i = 0; i < Math.min(CONCURRENCY, segments.length); i++) {
+				fetches[i] = fetchBuf(segments[i]);
+			}
+
 			for (let i = 0; i < segments.length; i++) {
 				// 일시정지 대기
 				while (pauseRequested && !cancelRequested) {
@@ -93,9 +106,15 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 					return;
 				}
 
-				const res = await fetch(proxyUrl(segments[i]));
-				if (!res.ok) throw new Error(`세그먼트 fetch 실패 (${res.status})`);
-				await writable.write(await res.arrayBuffer());
+				// 다음 세그먼트 선행 fetch 시작
+				const ahead = i + CONCURRENCY;
+				if (ahead < segments.length) {
+					fetches[ahead] = fetchBuf(segments[ahead]);
+				}
+
+				const buf = await fetches[i]!;
+				fetches[i] = null;
+				await writable.write(buf);
 
 				progress = Math.round(((i + 1) / segments.length) * 100);
 				progressLabel = `${i + 1} / ${segments.length} 세그먼트`;

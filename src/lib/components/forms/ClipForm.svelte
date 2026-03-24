@@ -51,8 +51,7 @@
 	const MAX_CLIP_SEC = 3600; // 60분 최대 클립 길이
 
 	let err = $state('');
-	let cancelClipRequested = $state(false);
-	let pauseClipRequested = $state(false);
+	let cancelClipRequested = false;
 	let dlStatus = $state<DlStatus>('idle');
 	let progress = $state(0);
 	let progressLabel = $state('');
@@ -113,7 +112,6 @@
 		if (!url || dlStatus !== 'idle' || !!tr.timeError) return;
 
 		cancelClipRequested = false;
-		pauseClipRequested = false;
 		dlStatus = 'loading';
 		err = '';
 		progress = 0;
@@ -149,30 +147,22 @@
 				initData = await fetchFile(proxyUrl(initUrl));
 			}
 
-			// 6. 선택된 세그먼트 순차 다운로드 (취소/일시정지 요청 시 처리)
-			const segParts: Uint8Array[] = [];
-			for (let idx = 0; idx < selectedIdxs.length; idx++) {
-				// 일시정지 대기 — 취소되면 즉시 탈출
-				while (pauseClipRequested && !cancelClipRequested) {
-					await new Promise<void>((r) => setTimeout(r, 200));
-				}
-				if (cancelClipRequested) {
-					dlStatus = 'idle';
-					progress = 0;
-					progressLabel = '';
-					return;
-				}
-				segParts.push(await fetchFile(proxyUrl(segments[selectedIdxs[idx]])));
-				progress = Math.round(((idx + 1) / selectedIdxs.length) * 80);
-				progressLabel = `${idx + 1} / ${selectedIdxs.length} 세그먼트`;
-			}
-
-			if (cancelClipRequested) {
-				dlStatus = 'idle';
-				progress = 0;
-				progressLabel = '';
-				return;
-			}
+			// 6. 선택된 세그먼트 병렬 다운로드
+			if (cancelClipRequested) { dlStatus = 'idle'; progress = 0; progressLabel = ''; return; }
+			let completedFetches = 0;
+			const segParts = await Promise.all(
+				selectedIdxs.map((segIdx) =>
+					fetchFile(proxyUrl(segments[segIdx])).then((data) => {
+						if (!cancelClipRequested) {
+							completedFetches++;
+							progress = Math.round((completedFetches / selectedIdxs.length) * 80);
+							progressLabel = `${completedFetches} / ${selectedIdxs.length} 세그먼트`;
+						}
+						return data;
+					})
+				)
+			);
+			if (cancelClipRequested) { dlStatus = 'idle'; progress = 0; progressLabel = ''; return; }
 
 			// 7. 세그먼트 바이너리 병합 → FFmpeg 입력 파일로 기록
 			const combined_parts: Uint8Array[] = initData ? [initData, ...segParts] : segParts;
@@ -288,14 +278,7 @@
 	<!-- 클립 생성 버튼 -->
 	{#if busy}
 		<button class="submit-btn" disabled>처리중...</button>
-		{#if dlStatus === 'downloading'}
-			{#if pauseClipRequested}
-				<button class="cancel-btn" onclick={() => (pauseClipRequested = false)}>재개 ▶</button>
-			{:else}
-				<button class="cancel-btn" onclick={() => (pauseClipRequested = true)}>일시정지 ⏸</button>
-			{/if}
-		{/if}
-		<button class="cancel-btn" onclick={() => { cancelClipRequested = true; pauseClipRequested = false; }}>취소 ✕</button>
+		<button class="cancel-btn" onclick={() => { cancelClipRequested = true; }}>취소 ✕</button>
 	{:else}
 		<button class="submit-btn" onclick={submit} disabled={!url || !!tr.timeError}>클립 생성 ✦</button>
 	{/if}
