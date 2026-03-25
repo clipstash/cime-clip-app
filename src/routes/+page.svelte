@@ -3,7 +3,7 @@
   import { sourceStore } from '$lib/stores/sourceStore.svelte';
   import { clipListStore } from '$lib/stores/clipListStore.svelte';
   import Background from '$lib/components/Background.svelte';
-  import Nav from '$lib/components/Nav.svelte';
+  // import Nav from '$lib/components/Nav.svelte';
   import ClipCard from '$lib/components/cards/ClipCard.svelte';
   import VideoCard from '$lib/components/cards/VideoCard.svelte';
   import RecordCard from '$lib/components/cards/RecordCard.svelte';
@@ -15,7 +15,7 @@
 </script>
 
 <Background />
-<Nav />
+<!-- <Nav /> -->
 
 <section class="hero">
   <p class="label">cime clip & video & recorder</p>
