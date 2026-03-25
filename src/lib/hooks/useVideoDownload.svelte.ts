@@ -59,7 +59,12 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 			// 3. 파일 저장 대화상자 — 사용자가 저장 위치 선택
 			//    fMP4(initUrl 있음) → .mp4 / MPEG-TS → .ts
 			const isFmp4 = initUrl !== null;
-			const baseName = ((suggestedTitle ?? info.title ?? 'video')).replace(/[\\/:*?"<>|]/g, '_');
+			const today = new Date();
+			const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+			const t = suggestedTitle ?? info.title ?? 'video';
+			const s = info.streamer;
+			const rawName = s ? `[${s}] ${t}_${dateStr}` : `${t}_${dateStr}`;
+			const baseName = rawName.replace(/[\\/:*?"<>|]/g, '_');
 			const ext = isFmp4 ? '.mp4' : '.ts';
 			const mimeType = isFmp4 ? 'video/mp4' : 'video/mp2t';
 

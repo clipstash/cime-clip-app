@@ -41,9 +41,9 @@
 	// 전체 영상 다운로드 상태 관리
 	const videoDl = useVideoDownload((info) => onVideoSuccess(info));
 
-	// 전체 다운로드 파일명 (title 변경 시 자동 동기화, 사용자가 직접 수정 가능)
+	// 전체 다운로드 파일명 (title/streamer 변경 시 자동 동기화, 사용자가 직접 수정 가능)
 	let videoFilename = $state('');
-	$effect(() => { videoFilename = title ?? ''; });
+	$effect(() => { videoFilename = makeBaseName(title, streamer); });
 
 	// ── 클립 다운로드 상태 ───────────────────────────────────────────
 	type DlStatus = 'idle' | 'loading' | 'downloading' | 'encoding' | 'error';
@@ -128,11 +128,16 @@
 			if (segments.length === 0) throw new Error('세그먼트를 찾을 수 없습니다');
 
 			// 3. 선택 구간에 해당하는 세그먼트 인덱스 필터링
+			// firstSegCumTime: 첫 번째 선택 세그먼트 시작 시간 (FFmpeg seek 오프셋 계산용)
 			let cumTime = 0;
 			const selectedIdxs: number[] = [];
+			let firstSegCumTime = 0;
 			for (let i = 0; i < segments.length; i++) {
 				const segDur = durations[i] || 2;
-				if (cumTime + segDur > tr.startSec && cumTime < tr.endSec) selectedIdxs.push(i);
+				if (cumTime + segDur > tr.startSec && cumTime < tr.endSec) {
+					if (selectedIdxs.length === 0) firstSegCumTime = cumTime;
+					selectedIdxs.push(i);
+				}
 				cumTime += segDur;
 			}
 			if (selectedIdxs.length === 0) throw new Error('지정한 구간이 현재 스트림 범위를 벗어납니다');
@@ -192,8 +197,10 @@
 					: 'MP4 변환 중...';
 				progress = 82 + Math.round((i / numParts) * 14);
 
+				// chunkStart - firstSegCumTime: 합친 파일 내 seek 오프셋 (절대/상대 PTS 모두 대응)
+				// -ss를 -i 앞에 두어 keyframe 기준 fast seek → 블랙 스크린 방지
 				await ffmpeg.exec([
-					'-ss', String(chunkStart),
+					'-ss', String(chunkStart - firstSegCumTime),
 					'-i', 'input.mp4',
 					'-t', String(chunkDur),
 					'-c', 'copy',
@@ -304,7 +311,7 @@
 		{/if}
 		<button class="cancel-btn" onclick={videoDl.cancel}>취소 ✕</button>
 	{:else}
-		<button class="submit-btn" onclick={() => videoDl.download(url, videoFilename || title)} disabled={!url}>전체 다운로드 ✦</button>
+		<button class="submit-btn" onclick={() => videoDl.download(url, videoFilename || makeBaseName(title, streamer))} disabled={!url}>전체 다운로드 ✦</button>
 	{/if}
 </div>
 
