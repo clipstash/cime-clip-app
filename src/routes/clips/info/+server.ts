@@ -164,6 +164,14 @@ export const GET: RequestHandler = async ({ url }) => {
 	if (!targetUrl) {
 		error(400, 'Missing url parameter');
 	}
+	if (targetUrl.length > 4096) {
+		error(400, 'URL too long');
+	}
+	try {
+		new URL(targetUrl);
+	} catch {
+		error(400, 'Invalid url parameter');
+	}
 
 	// ci.me 계열 URL 여부 판별
 	const isCime = /ci\.?me|cime/i.test(targetUrl);
