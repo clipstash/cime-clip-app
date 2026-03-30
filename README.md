@@ -92,7 +92,7 @@ src/
 │   │   └── clipListStore.svelte.ts   # 클립·영상·녹화 목록 및 프리뷰 모달 상태
 │   ├── components/
 │   │   ├── Background.svelte         # 데코레이티브 배경
-│   │   ├── Nav.svelte                # 상단 네비게이션
+│   │   ├── Nav.svelte                # 상단 네비게이션 (현재 비활성화)
 │   │   ├── SourcePreview.svelte      # 스트림 메타데이터 표시 (썸네일, 제목, 길이)
 │   │   ├── PreviewModal.svelte       # 영상 프리뷰 모달
 │   │   ├── forms/
@@ -101,7 +101,8 @@ src/
 │   │   ├── cards/
 │   │   │   ├── ClipCard.svelte       # 완료된 클립 카드
 │   │   │   ├── VideoCard.svelte      # 완료된 영상 다운로드 카드
-│   │   │   └── RecordCard.svelte     # 완료된 녹화 카드
+│   │   │   ├── RecordCard.svelte     # 완료된 녹화 카드
+│   │   │   └── PreviewCard.svelte    # 생성 예정 클립 미리보기 카드
 │   │   └── ui/
 │   │       ├── HmsInput.svelte       # 시:분:초 입력 필드
 │   │       ├── TimelineSlider.svelte # 드래그 가능한 타임라인 슬라이더
