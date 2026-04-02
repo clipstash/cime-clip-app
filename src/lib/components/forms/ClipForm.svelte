@@ -41,9 +41,11 @@
 	// 전체 영상 다운로드 상태 관리
 	const videoDl = useVideoDownload((info) => onVideoSuccess(info));
 
-	// 전체 다운로드 파일명 (title/streamer 변경 시 자동 동기화, 사용자가 직접 수정 가능)
-	let videoFilename = $state('');
-	$effect(() => { videoFilename = makeBaseName(title, streamer); });
+	// 전체 다운로드 파일명: url이 바뀌면 자동 초기화, 같은 url 내에서는 사용자 편집 유지
+	let videoFilenameOverride = $state<{ url: string; value: string } | null>(null);
+	const videoFilename = $derived(
+		videoFilenameOverride?.url === url ? videoFilenameOverride.value : makeBaseName(title, streamer)
+	);
 
 	// ── 클립 다운로드 상태 ───────────────────────────────────────────
 	type DlStatus = 'idle' | 'loading' | 'downloading' | 'encoding' | 'error';
@@ -296,7 +298,8 @@
 	<input
 		class="filename-input"
 		type="text"
-		bind:value={videoFilename}
+		value={videoFilename}
+		oninput={(e) => { videoFilenameOverride = { url, value: e.currentTarget.value }; }}
 		placeholder="파일명 (확장자 제외)"
 		disabled={videoDl.busy}
 	/>
