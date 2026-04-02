@@ -256,9 +256,9 @@
 	<div class="time-input">
 		<span class="time-label" aria-hidden="true">클립</span>
 		<HmsInput
-			bind:h={tr.startH}
-			bind:m={tr.startM}
-			bind:s={tr.startS}
+			bind:h={tr.start.h}
+			bind:m={tr.start.m}
+			bind:s={tr.start.s}
 			ariaPrefix="시작"
 			fieldPrefix="start"
 			onFocus={(field) => (tr.focusedField = field)}
@@ -271,9 +271,9 @@
 	<div class="time-input">
 		<span class="time-label" aria-hidden="true">→</span>
 		<HmsInput
-			bind:h={tr.endH}
-			bind:m={tr.endM}
-			bind:s={tr.endS}
+			bind:h={tr.end.h}
+			bind:m={tr.end.m}
+			bind:s={tr.end.s}
 			ariaPrefix="종료"
 			fieldPrefix="end"
 			onFocus={(field) => (tr.focusedField = field)}

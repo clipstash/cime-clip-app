@@ -5,15 +5,9 @@ export function useTimeRange(
 	getTotalSec: () => number,
 	getDurationLoaded: () => boolean
 ) {
-	// ── 반응형 상태: 시작 시간 (H:M:S) ──────────────────────────────
-	let startH = $state(0),
-		startM = $state(0),
-		startS = $state(0);
-
-	// ── 반응형 상태: 종료 시간 (H:M:S) ──────────────────────────────
-	let endH = $state(0),
-		endM = $state(0),
-		endS = $state(0);
+	// ── 반응형 상태: 시작/종료 시간 ──────────────────────────────────
+	let start = $state({ h: 0, m: 0, s: 0 });
+	let end = $state({ h: 0, m: 0, s: 0 });
 
 	// ── 반응형 상태: UI 상호작용 ─────────────────────────────────────
 	let focusedField = $state<string | null>(null); // 현재 포커스된 시간 입력 필드
@@ -21,8 +15,8 @@ export function useTimeRange(
 	let dragging = $state<'start' | 'end' | null>(null); // 드래그 중인 핸들 ('start' | 'end')
 
 	// ── 파생 값 ──────────────────────────────────────────────────────
-	const startSec = $derived(startH * 3600 + startM * 60 + startS); // 시작 시간 (초)
-	const endSec = $derived(endH * 3600 + endM * 60 + endS); // 종료 시간 (초)
+	const startSec = $derived(start.h * 3600 + start.m * 60 + start.s); // 시작 시간 (초)
+	const endSec = $derived(end.h * 3600 + end.m * 60 + end.s); // 종료 시간 (초)
 	const clipDuration = $derived(Math.max(0, endSec - startSec)); // 클립 길이 (초)
 
 	// 타임라인 상의 시작/종료 위치 비율 (0~100%)
@@ -50,12 +44,12 @@ export function useTimeRange(
 	// ── 필드 맵 ──────────────────────────────────────────────────────
 	// 필드명 → getter/setter/최댓값 매핑 (clampField, step에서 사용)
 	const fieldMap: Record<string, { get: () => number; set: (v: number) => void; max: number }> = {
-		startH: { get: () => startH, set: (v) => (startH = v), max: 999 },
-		startM: { get: () => startM, set: (v) => (startM = v), max: 59 },
-		startS: { get: () => startS, set: (v) => (startS = v), max: 59 },
-		endH: { get: () => endH, set: (v) => (endH = v), max: 999 },
-		endM: { get: () => endM, set: (v) => (endM = v), max: 59 },
-		endS: { get: () => endS, set: (v) => (endS = v), max: 59 }
+		startH: { get: () => start.h, set: (v) => (start.h = v), max: 999 },
+		startM: { get: () => start.m, set: (v) => (start.m = v), max: 59 },
+		startS: { get: () => start.s, set: (v) => (start.s = v), max: 59 },
+		endH: { get: () => end.h, set: (v) => (end.h = v), max: 999 },
+		endM: { get: () => end.m, set: (v) => (end.m = v), max: 59 },
+		endS: { get: () => end.s, set: (v) => (end.s = v), max: 59 }
 	};
 
 	// ── 초(sec) → H:M:S 상태 설정 ────────────────────────────────────
@@ -65,15 +59,8 @@ export function useTimeRange(
 		const h = Math.floor(sec / 3600),
 			m = Math.floor((sec % 3600) / 60),
 			s = sec % 60;
-		if (target === 'start') {
-			startH = h;
-			startM = m;
-			startS = s;
-		} else {
-			endH = h;
-			endM = m;
-			endS = s;
-		}
+		if (target === 'start') { start.h = h; start.m = m; start.s = s; }
+		else { end.h = h; end.m = m; end.s = s; }
 	}
 
 	// ── 필드 값 범위 클램프 ───────────────────────────────────────────
@@ -139,88 +126,26 @@ export function useTimeRange(
 	// (duration 로드 후에도 자동 설정 없이 사용자가 직접 구간 설정)
 	$effect(() => {
 		void getUrl();
-		startH = 0;
-		startM = 0;
-		startS = 0;
-		endH = 0;
-		endM = 0;
-		endS = 0;
+		start.h = 0; start.m = 0; start.s = 0;
+		end.h = 0; end.m = 0; end.s = 0;
 	});
 
-	// ── 반환 객체 (반응형 getter/setter 노출) ────────────────────────
+	// ── 반환 객체 ────────────────────────────────────────────────────
 	return {
-		get startH() {
-			return startH;
-		},
-		set startH(v: number) {
-			startH = v;
-		},
-		get startM() {
-			return startM;
-		},
-		set startM(v: number) {
-			startM = v;
-		},
-		get startS() {
-			return startS;
-		},
-		set startS(v: number) {
-			startS = v;
-		},
-		get endH() {
-			return endH;
-		},
-		set endH(v: number) {
-			endH = v;
-		},
-		get endM() {
-			return endM;
-		},
-		set endM(v: number) {
-			endM = v;
-		},
-		get endS() {
-			return endS;
-		},
-		set endS(v: number) {
-			endS = v;
-		},
-		get focusedField() {
-			return focusedField;
-		},
-		set focusedField(v: string | null) {
-			focusedField = v;
-		},
-		get trackEl() {
-			return trackEl;
-		},
-		set trackEl(v: HTMLDivElement | null) {
-			trackEl = v;
-		},
-		get dragging() {
-			return dragging;
-		},
-		set dragging(v: 'start' | 'end' | null) {
-			dragging = v;
-		},
-		get startSec() {
-			return startSec;
-		},
-		get endSec() {
-			return endSec;
-		},
-		get clipDuration() {
-			return clipDuration;
-		},
-		get startPct() {
-			return startPct;
-		},
-		get endPct() {
-			return endPct;
-		},
-		get timeError() {
-			return timeError;
-		},
+		get start() { return start; },
+		get end() { return end; },
+		get focusedField() { return focusedField; },
+		set focusedField(v: string | null) { focusedField = v; },
+		get trackEl() { return trackEl; },
+		set trackEl(v: HTMLDivElement | null) { trackEl = v; },
+		get dragging() { return dragging; },
+		set dragging(v: 'start' | 'end' | null) { dragging = v; },
+		get startSec() { return startSec; },
+		get endSec() { return endSec; },
+		get clipDuration() { return clipDuration; },
+		get startPct() { return startPct; },
+		get endPct() { return endPct; },
+		get timeError() { return timeError; },
 		clampField,
 		step,
 		setFromSec,
