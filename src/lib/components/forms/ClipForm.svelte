@@ -4,6 +4,7 @@
 	import { fetchClipInfo } from '$lib/api/clips';
 	import { parseM3u8 } from '$lib/utils/stream';
 	import { proxyUrl } from '$lib/utils/proxy';
+	import { makeBaseName } from '$lib/utils/filename';
 	import { useTimeRange } from '$lib/hooks/useTimeRange.svelte';
 	import { useVideoDownload } from '$lib/hooks/useVideoDownload.svelte';
 	import { clipListStore } from '$lib/stores/clipListStore.svelte';
@@ -63,14 +64,6 @@
 	const busy = $derived(
 		dlStatus === 'loading' || dlStatus === 'downloading' || dlStatus === 'encoding'
 	);
-
-	// 파일명 베이스: [스트리머] 제목_YYYYMMDD 형식 (녹화와 동일)
-	function makeBaseName(t: string | null, s: string | null): string {
-		const today = new Date();
-		const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
-		const raw = s ? `[${s}] ${t ?? 'clip'}_${dateStr}` : `${t ?? 'clip'}_${dateStr}`;
-		return raw.replace(/[\\/:*?"<>|]/g, '_');
-	}
 
 	// 생성 예정 파일 목록 (클립 파트)
 	const previewFiles = $derived.by(() => {

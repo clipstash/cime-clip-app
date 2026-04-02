@@ -6,6 +6,18 @@ import type { ActiveRecord } from '$lib/api/record';
 // ── 유틸 ─────────────────────────────────────────────────────────
 import { localUrl } from '$lib/utils/url';
 
+// ── 생성 예정 미리보기 타입 ───────────────────────────────────────
+type PreviewState = {
+	files: { filename: string; timeLabel: string }[];
+	title: string | null;
+	streamer: string | null;
+	thumbnail: string | null;
+	busy: boolean;
+	progress: number;
+	progressLabel: string;
+	currentFileIdx: number;
+};
+
 // ── 클립/영상/녹화 목록 및 모달 상태 스토어 ──────────────────────
 // 앱 전역에서 공유되는 완료된 작업 목록과 미리보기 모달 상태를 관리
 class ClipListStore {
@@ -15,29 +27,9 @@ class ClipListStore {
 	records = $state<ActiveRecord[]>([]); // 완료된 녹화 목록
 
 	// ── 생성 예정 미리보기 상태 ──────────────────────────────────────
-	preview = $state<{
-		files: { filename: string; timeLabel: string }[];
-		title: string | null;
-		streamer: string | null;
-		thumbnail: string | null;
-		busy: boolean;
-		progress: number;
-		progressLabel: string;
-		currentFileIdx: number;
-	} | null>(null);
+	preview = $state<PreviewState | null>(null);
 
-	setPreview(
-		data: {
-			files: { filename: string; timeLabel: string }[];
-			title: string | null;
-			streamer: string | null;
-			thumbnail: string | null;
-			busy: boolean;
-			progress: number;
-			progressLabel: string;
-			currentFileIdx: number;
-		} | null
-	) {
+	setPreview(data: PreviewState | null) {
 		this.preview = data;
 	}
 
