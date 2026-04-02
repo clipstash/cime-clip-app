@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { FFmpeg } from '@ffmpeg/ffmpeg';
 	import { fetchFile } from '@ffmpeg/util';
 	import { loadFfmpeg } from '$lib/ffmpeg';
 	import { fetchClipInfo } from '$lib/api/clips';
@@ -107,6 +108,48 @@
 		return () => clipListStore.setPreview(null);
 	});
 
+	// ── 헬퍼 함수 ───────────────────────────────────────────────────
+
+	// 선택 구간에 해당하는 세그먼트 인덱스 및 첫 세그먼트 시작 시간 반환
+	function filterSegments(
+		segments: string[],
+		durations: number[],
+		startSec: number,
+		endSec: number
+	): { idxs: number[]; firstCumTime: number } {
+		let cumTime = 0;
+		const idxs: number[] = [];
+		let firstCumTime = 0;
+		for (let i = 0; i < segments.length; i++) {
+			const segDur = durations[i] || 2;
+			if (cumTime + segDur > startSec && cumTime < endSec) {
+				if (idxs.length === 0) firstCumTime = cumTime;
+				idxs.push(i);
+			}
+			cumTime += segDur;
+		}
+		return { idxs, firstCumTime };
+	}
+
+	// Uint8Array 배열을 하나로 병합
+	function concatBuffers(parts: Uint8Array[]): Uint8Array {
+		const total = parts.reduce((a, p) => a + p.byteLength, 0);
+		const out = new Uint8Array(total);
+		let offset = 0;
+		for (const p of parts) { out.set(p, offset); offset += p.byteLength; }
+		return out;
+	}
+
+	// FFmpeg로 input.mp4를 seekSec 지점부터 durSec 길이로 트림하여 ArrayBuffer 반환
+	async function trimPart(ffmpeg: FFmpeg, outFile: string, seekSec: number, durSec: number): Promise<ArrayBuffer> {
+		await ffmpeg.exec(['-ss', String(seekSec), '-i', 'input.mp4', '-t', String(durSec), '-c', 'copy', outFile]);
+		const raw = (await ffmpeg.readFile(outFile)) as Uint8Array;
+		await ffmpeg.deleteFile(outFile);
+		const buf = new ArrayBuffer(raw.byteLength);
+		new Uint8Array(buf).set(raw);
+		return buf;
+	}
+
 	// ── 클립 생성 ────────────────────────────────────────────────────
 	async function submit() {
 		if (!url || dlStatus !== 'idle' || !!tr.timeError) return;
@@ -129,17 +172,7 @@
 
 			// 3. 선택 구간에 해당하는 세그먼트 인덱스 필터링
 			// firstSegCumTime: 첫 번째 선택 세그먼트 시작 시간 (FFmpeg seek 오프셋 계산용)
-			let cumTime = 0;
-			const selectedIdxs: number[] = [];
-			let firstSegCumTime = 0;
-			for (let i = 0; i < segments.length; i++) {
-				const segDur = durations[i] || 2;
-				if (cumTime + segDur > tr.startSec && cumTime < tr.endSec) {
-					if (selectedIdxs.length === 0) firstSegCumTime = cumTime;
-					selectedIdxs.push(i);
-				}
-				cumTime += segDur;
-			}
+			const { idxs: selectedIdxs, firstCumTime: firstSegCumTime } = filterSegments(segments, durations, tr.startSec, tr.endSec);
 			if (selectedIdxs.length === 0) throw new Error('지정한 구간이 현재 스트림 범위를 벗어납니다');
 
 			// 4. FFmpeg 로드
@@ -170,15 +203,7 @@
 			if (cancelClipRequested) { dlStatus = 'idle'; progress = 0; progressLabel = ''; return; }
 
 			// 7. 세그먼트 바이너리 병합 → FFmpeg 입력 파일로 기록
-			const combined_parts: Uint8Array[] = initData ? [initData, ...segParts] : segParts;
-			const totalBytes = combined_parts.reduce((a, p) => a + p.byteLength, 0);
-			const combined = new Uint8Array(totalBytes);
-			let byteOffset = 0;
-			for (const part of combined_parts) {
-				combined.set(part, byteOffset);
-				byteOffset += part.byteLength;
-			}
-			await ffmpeg.writeFile('input.mp4', combined);
+			await ffmpeg.writeFile('input.mp4', concatBuffers(initData ? [initData, ...segParts] : segParts));
 
 			// 8. FFmpeg로 구간 트림 — 60분 초과 시 파트별 분할 → 파트별 onSuccess 콜백
 			dlStatus = 'encoding';
@@ -199,21 +224,10 @@
 
 				// chunkStart - firstSegCumTime: 합친 파일 내 seek 오프셋 (절대/상대 PTS 모두 대응)
 				// -ss를 -i 앞에 두어 keyframe 기준 fast seek → 블랙 스크린 방지
-				await ffmpeg.exec([
-					'-ss', String(chunkStart - firstSegCumTime),
-					'-i', 'input.mp4',
-					'-t', String(chunkDur),
-					'-c', 'copy',
-					outFile
-				]);
-
-				const raw = (await ffmpeg.readFile(outFile)) as Uint8Array;
-				const buf = new ArrayBuffer(raw.byteLength);
-				new Uint8Array(buf).set(raw);
-				const blob = new Blob([buf], { type: 'video/mp4' });
+				const raw = await trimPart(ffmpeg, outFile, chunkStart - firstSegCumTime, chunkDur);
+				const blob = new Blob([raw], { type: 'video/mp4' });
 				const filename = numParts > 1 ? `${baseName}_part${i + 1}.mp4` : `${baseName}.mp4`;
 				onSuccess({ title: info.title, startSec: chunkStart, endSec: chunkStart + chunkDur, blobUrl: URL.createObjectURL(blob), filename });
-				await ffmpeg.deleteFile(outFile);
 			}
 
 			// 9. FFmpeg 입력 파일 정리
