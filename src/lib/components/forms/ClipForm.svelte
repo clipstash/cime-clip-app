@@ -53,6 +53,11 @@
 
 	const MAX_CLIP_SEC = 3600; // 60분 최대 클립 길이
 
+	// 진행률 구간: 다운로드 0~80%, 인코딩 82~96%, 완료 100%
+	const PROGRESS_DOWNLOAD_END = 80;
+	const PROGRESS_ENCODE_START = 82;
+	const PROGRESS_ENCODE_RANGE = 14;
+
 	let err = $state('');
 	let cancelClipRequested = false;
 	let dlStatus = $state<DlStatus>('idle');
@@ -155,7 +160,7 @@
 					fetchFile(proxyUrl(segments[segIdx])).then((data) => {
 						if (!cancelClipRequested) {
 							completedFetches++;
-							progress = Math.round((completedFetches / selectedIdxs.length) * 80);
+							progress = Math.round((completedFetches / selectedIdxs.length) * PROGRESS_DOWNLOAD_END);
 							progressLabel = `${completedFetches} / ${selectedIdxs.length} 세그먼트`;
 						}
 						return data;
@@ -190,7 +195,7 @@
 				progressLabel = numParts > 1
 					? `파트 ${i + 1}/${numParts} 인코딩 중...`
 					: 'MP4 변환 중...';
-				progress = 82 + Math.round((i / numParts) * 14);
+				progress = PROGRESS_ENCODE_START + Math.round((i / numParts) * PROGRESS_ENCODE_RANGE);
 
 				// chunkStart - firstSegCumTime: 합친 파일 내 seek 오프셋 (절대/상대 PTS 모두 대응)
 				// -ss를 -i 앞에 두어 keyframe 기준 fast seek → 블랙 스크린 방지
