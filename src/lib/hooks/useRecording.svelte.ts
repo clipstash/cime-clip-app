@@ -112,8 +112,8 @@ export function useRecording(onSuccess?: OnSuccess) {
 
 	function resume() {
 		if (status !== 'paused') return;
-		pollEpoch++;  // 새 세대 시작
-		sessions.push([]);    // 재개 후 세그먼트는 새 세션으로 분리 (타임스탬프 불연속 방지)
+		pollEpoch++;          // 새 세대 시작
+		sessions.push([]);    // 재개 후 세그먼트는 새 세션으로 분리
 		isFirstPoll = true;   // 일시멈춤 구간 세그먼트는 seen 처리만 하고 건너뜀
 		status = 'recording';
 		pollSegments();
@@ -144,27 +144,21 @@ export function useRecording(onSuccess?: OnSuccess) {
 			}
 
 			if (nonEmptySessions.length === 1) {
-				// 일시멈춤 없음: init + 세그먼트를 단일 바이너리로 병합
 				await writeSession(0, 'input.mp4');
 				const ret = await ffmpeg.exec(['-i', 'input.mp4', '-c', 'copy', '-movflags', '+faststart', 'output.mp4']);
 				await ffmpeg.deleteFile('input.mp4');
 				if (ret !== 0) throw new Error(`인코딩 실패 (코드: ${ret})`);
 			} else {
-				// 일시멈춤 있음:
-				// 1단계 — 세션별 raw fMP4를 정규화된 MP4로 변환 (-copyts -start_at_zero 로 타임스탬프 0 기준으로 재조정)
-				// 2단계 — concat demuxer로 순차 연결 (각 파일이 0부터 시작하므로 concat이 자동 오프셋 적용)
+				// concat demuxer의 -reset_timestamps 1로 세션 간 타임스탬프를 순차 재배치
+				// (세션별 별도 정규화 없이 concat 단일 패스로 처리)
 				const concatLines: string[] = [];
 				for (let i = 0; i < nonEmptySessions.length; i++) {
-					const rawFile = `session_raw_${i}.mp4`;
-					const normFile = `session_${i}.mp4`;
-					await writeSession(i, rawFile);
-					const ret = await ffmpeg.exec(['-i', rawFile, '-c', 'copy', '-copyts', '-start_at_zero', normFile]);
-					await ffmpeg.deleteFile(rawFile);
-					if (ret !== 0) throw new Error(`세션 ${i} 타임스탬프 정규화 실패 (코드: ${ret})`);
-					concatLines.push(`file '${normFile}'`);
+					const file = `session_${i}.mp4`;
+					await writeSession(i, file);
+					concatLines.push(`file '${file}'`);
 				}
 				await ffmpeg.writeFile('concat.txt', new TextEncoder().encode(concatLines.join('\n')));
-				const ret = await ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', 'concat.txt', '-c', 'copy', '-movflags', '+faststart', 'output.mp4']);
+				const ret = await ffmpeg.exec(['-f', 'concat', '-safe', '0', '-reset_timestamps', '1', '-i', 'concat.txt', '-c', 'copy', '-movflags', '+faststart', 'output.mp4']);
 				await ffmpeg.deleteFile('concat.txt');
 				for (let i = 0; i < nonEmptySessions.length; i++) await ffmpeg.deleteFile(`session_${i}.mp4`);
 				if (ret !== 0) throw new Error(`세션 병합 실패 (코드: ${ret})`);
