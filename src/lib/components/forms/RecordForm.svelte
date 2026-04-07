@@ -1,6 +1,7 @@
 <script lang="ts">
   import { fetchClipInfo } from '$lib/api/clips';
   import { useRecording } from '$lib/hooks/useRecording.svelte';
+  import { makeBaseName } from '$lib/utils/filename';
 
   // ── Props 타입 ───────────────────────────────────────────────────
   type Props = {
@@ -26,12 +27,8 @@
     titleLoading = true;
     const t = setTimeout(async () => {
       const info = await fetchClipInfo(targetUrl);
-      if (info && info.title && !fileNameEdited) {
-        const today = new Date();
-        const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
-        recFileName = info.streamer
-          ? `[${info.streamer}] ${info.title}_${dateStr}`
-          : `${info.title}_${dateStr}`;
+      if (info && !fileNameEdited) {
+        recFileName = makeBaseName(info.title, info.streamer);
       }
       titleLoading = false;
     }, 600);
