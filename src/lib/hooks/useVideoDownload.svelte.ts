@@ -18,7 +18,9 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 	let err = $state(''); // 에러 메시지
 
 	// ── 내부 변수 (반응형 불필요) ─────────────────────────────────────
+	// cancelRequested: UI 반영 불필요(버튼 비활성화는 status로 처리) → 일반 변수
 	let cancelRequested = false;
+	// pauseRequested: isPaused getter로 버튼 텍스트에 반영 → $state 필요
 	let pauseRequested = $state(false);
 
 	const busy = $derived(status === 'loading' || status === 'downloading');
