@@ -20,11 +20,13 @@
 <div class="timeline-wrap">
   <div class="timeline-track" bind:this={trackEl} onclick={onSeekToClick} role="presentation">
     <div class="timeline-fill" style="left: {startPct}%; width: {Math.max(0, endPct - startPct)}%"></div>
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div class="timeline-handle" style="left: {startPct}%"
       onpointerdown={(e) => onStartDrag(e, 'start')} onpointermove={onDragMove} onpointerup={onDragEnd}
       onclick={(e) => e.stopPropagation()}
       role="slider" aria-label="시작 지점" aria-valuenow={startSec} aria-valuemin={0} aria-valuemax={totalSec} tabindex="0"
     ></div>
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div class="timeline-handle" style="left: {endPct}%"
       onpointerdown={(e) => onStartDrag(e, 'end')} onpointermove={onDragMove} onpointerup={onDragEnd}
       onclick={(e) => e.stopPropagation()}
