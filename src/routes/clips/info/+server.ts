@@ -75,16 +75,15 @@ async function getDurationFromM3u8(
 	}
 }
 
-// ── HTML 스크래핑으로 스트림 정보 조회 ──────────────────────────
-// yt-dlp가 지원하지 않는 사이트(ci.me 등)를 위한 fallback
-// og:title / og:image 메타태그와 m3u8 URL 패턴으로 추출
-// duration: video:duration 메타태그 → m3u8 EXTINF 합산 순서로 시도
-async function getInfoViaScraping(url: string): Promise<YtDlpInfo> {
-	const res = await fetch(url, {
-		headers: { 'User-Agent': 'Mozilla/5.0' }
-	});
-	const html = await res.text();
-
+// ── HTML 메타태그 파싱 (순수 함수) ──────────────────────────────
+// og:title / og:image / m3u8 URL 패턴으로 스트림 메타데이터 추출
+function parsePageMeta(html: string, pageUrl: string): {
+	title: string | undefined;
+	thumbnail: string | undefined;
+	uploader: string | undefined;
+	manifest_url: string | undefined;
+	is_live: boolean;
+} {
 	// 플랫폼명: og:site_name (제목에서 제거하기 위해 먼저 추출)
 	const siteNameMatch = html.match(/<meta[^>]+property="og:site_name"[^>]+content="([^"]+)"/);
 	const siteName = siteNameMatch?.[1] ?? null;
@@ -101,7 +100,7 @@ async function getInfoViaScraping(url: string): Promise<YtDlpInfo> {
 	// 스트리머 이름: URL slug로 페이지 내 JSON에서 실제 채널 name 추출
 	// ci.me는 <script type="application/json"> 안에 {"slug":"...", "name":"..."} 형태로 채널 정보를 포함함
 	let uploader: string | undefined;
-	const slugMatch = url.match(/\/@([^/?#]+)/);
+	const slugMatch = pageUrl.match(/\/@([^/?#]+)/);
 	if (slugMatch) {
 		const slug = slugMatch[1];
 		const escapedSlug = slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -135,23 +134,36 @@ async function getInfoViaScraping(url: string): Promise<YtDlpInfo> {
 	// 라이브 판단 우선순위:
 	// 1. playback.live-video.net m3u8 URL이 HTML에 있음
 	// 2. URL 경로가 /live로 끝남 (ci.me/@username/live 패턴)
-	const is_live = liveM3u8Match != null || /\/live\/?$/i.test(url);
+	const is_live = liveM3u8Match != null || /\/live\/?$/i.test(pageUrl);
+
+	return { title, thumbnail: thumbnailMatch?.[1] ?? undefined, uploader, manifest_url, is_live };
+}
+
+// ── duration 해석 (메타태그 우선, fallback으로 m3u8 EXTINF 합산) ─
+async function resolveDuration(
+	html: string,
+	manifest_url: string | undefined,
+	is_live: boolean
+): Promise<number | undefined> {
 	const durationMetaMatch = html.match(
 		/<meta[^>]+(?:property|name)="video:duration"[^>]+content="(\d+)"/
 	) ?? html.match(/<meta[^>]+content="(\d+)"[^>]+(?:property|name)="video:duration"/);
-	const m3u8Result = !is_live && manifest_url ? await getDurationFromM3u8(manifest_url) : null;
-	const duration = durationMetaMatch
-		? parseInt(durationMetaMatch[1], 10)
-		: m3u8Result?.duration;
+	if (durationMetaMatch) return parseInt(durationMetaMatch[1], 10);
+	if (!is_live && manifest_url) {
+		const m3u8Result = await getDurationFromM3u8(manifest_url);
+		return m3u8Result.duration;
+	}
+	return undefined;
+}
 
-	return {
-		title,
-		thumbnail: thumbnailMatch?.[1] ?? undefined,
-		manifest_url,
-		duration,
-		is_live,
-		uploader
-	};
+// ── HTML 스크래핑으로 스트림 정보 조회 ──────────────────────────
+// yt-dlp가 지원하지 않는 사이트(ci.me 등)를 위한 fallback
+async function getInfoViaScraping(url: string): Promise<YtDlpInfo> {
+	const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+	const html = await res.text();
+	const meta = parsePageMeta(html, url);
+	const duration = await resolveDuration(html, meta.manifest_url, meta.is_live);
+	return { ...meta, duration };
 }
 
 // ── 클립 정보 조회 엔드포인트 ────────────────────────────────────
@@ -163,6 +175,14 @@ export const GET: RequestHandler = async ({ url }) => {
 	const targetUrl = url.searchParams.get('url');
 	if (!targetUrl) {
 		error(400, 'Missing url parameter');
+	}
+	if (targetUrl.length > 4096) {
+		error(400, 'URL too long');
+	}
+	try {
+		new URL(targetUrl);
+	} catch {
+		error(400, 'Invalid url parameter');
 	}
 
 	// ci.me 계열 URL 여부 판별

@@ -24,6 +24,14 @@ export const GET: RequestHandler = async ({ url }) => {
 	if (!targetUrl) {
 		error(400, 'Missing url parameter');
 	}
+	if (targetUrl.length > 4096) {
+		error(400, 'URL too long');
+	}
+	try {
+		new URL(targetUrl);
+	} catch {
+		error(400, 'Invalid url parameter');
+	}
 
 	// 세그먼트 요청: CDN으로 직접 리다이렉트 (Vercel 대역폭 절감)
 	// - m3u8 플레이리스트, 썸네일 이미지 등은 제외하고 프록시로 처리
