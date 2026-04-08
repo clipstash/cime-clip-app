@@ -3,6 +3,7 @@ import { loadFfmpeg } from '$lib/ffmpeg';
 import { fetchClipInfo } from '$lib/api/clips';
 import { parseM3u8 } from '$lib/utils/stream';
 import { proxyUrl } from '$lib/utils/proxy';
+import { getFmp4Duration } from '$lib/utils/fmp4';
 
 export type RecordStatus = 'idle' | 'loading' | 'recording' | 'paused' | 'encoding' | 'error';
 
@@ -66,7 +67,8 @@ export function useRecording(onSuccess?: OnSuccess) {
 						if (status !== 'recording' || pollEpoch !== myEpoch) return;
 						segmentsSeen.add(seg);
 						currentSession.push(data);
-						elapsedSec += durations[si] ?? 0;
+						// #EXTINF 명목값 대신 moof/traf/trun 실제 샘플 duration 사용
+						elapsedSec += getFmp4Duration(initData, data, durations[si] ?? 0);
 						segCount++;
 					}
 				}
