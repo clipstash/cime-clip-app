@@ -12,6 +12,7 @@ export function useRecording(onSuccess?: OnSuccess) {
 	let status = $state<RecordStatus>('idle');
 	let err = $state('');
 	let segCount = $state(0);
+	let elapsedSec = $state(0);
 
 	// ── 내부 변수 (반응형 불필요) ────────────────────────────────────
 	let m3u8Url = '';
@@ -46,7 +47,7 @@ export function useRecording(onSuccess?: OnSuccess) {
 		const myEpoch = pollEpoch;
 		if (status !== 'recording' || !m3u8Url) return;
 		try {
-			const { initUrl, segments: newSegs } = await parseM3u8(m3u8Url);
+			const { initUrl, segments: newSegs, durations } = await parseM3u8(m3u8Url);
 			if (status !== 'recording' || pollEpoch !== myEpoch) return;
 			if (initUrl && !initData) {
 				initData = await fetchSegment(initUrl);
@@ -58,12 +59,14 @@ export function useRecording(onSuccess?: OnSuccess) {
 				isFirstPoll = false;
 			} else {
 				const currentSession = sessions[sessions.length - 1];
-				for (const seg of newSegs) {
+				for (let si = 0; si < newSegs.length; si++) {
+					const seg = newSegs[si];
 					if (!segmentsSeen.has(seg)) {
 						const data = await fetchSegment(seg);
 						if (status !== 'recording' || pollEpoch !== myEpoch) return;
 						segmentsSeen.add(seg);
 						currentSession.push(data);
+						elapsedSec += durations[si] ?? 0;
 						segCount++;
 					}
 				}
@@ -87,6 +90,7 @@ export function useRecording(onSuccess?: OnSuccess) {
 		sessions = [[]];
 		segmentsSeen = new SvelteSet();
 		segCount = 0;
+		elapsedSec = 0;
 		isFirstPoll = true;
 
 		try {
@@ -133,43 +137,48 @@ export function useRecording(onSuccess?: OnSuccess) {
 			status = 'encoding';
 			ffmpeg = await loadFfmpeg();
 
-			// 세션의 raw fMP4 바이트를 ffmpeg FS에 기록하는 헬퍼
-			async function writeSession(idx: number, file: string) {
-				const parts: Uint8Array[] = initData ? [initData, ...nonEmptySessions[idx]] : [...nonEmptySessions[idx]];
+			// 1단계: 각 세션(fMP4)을 일반 seekable MP4로 변환.
+			// fMP4는 seekable moov가 없어 concat demuxer가 파싱하지 못하므로 먼저 변환.
+			const sessionFiles: string[] = [];
+			for (let i = 0; i < nonEmptySessions.length; i++) {
+				const segs = nonEmptySessions[i];
+				const parts: Uint8Array[] = initData ? [initData, ...segs] : [...segs];
 				const totalBytes = parts.reduce((a, p) => a + p.byteLength, 0);
 				const combined = new Uint8Array(totalBytes);
 				let byteOffset = 0;
 				for (const part of parts) { combined.set(part, byteOffset); byteOffset += part.byteLength; }
-				await ffmpeg!.writeFile(file, combined);
+				await ffmpeg!.writeFile(`in_${i}.mp4`, combined);
+				const r = await ffmpeg!.exec(['-i', `in_${i}.mp4`, '-c', 'copy', `seg_${i}.mp4`]);
+				await ffmpeg!.deleteFile(`in_${i}.mp4`);
+				if (r !== 0) throw new Error(`세션 ${i} 변환 실패 (코드: ${r})`);
+				sessionFiles.push(`seg_${i}.mp4`);
 			}
 
-			if (nonEmptySessions.length === 1) {
-				await writeSession(0, 'input.mp4');
-				const ret = await ffmpeg.exec(['-i', 'input.mp4', '-c', 'copy', '-movflags', '+faststart', 'output.mp4']);
-				await ffmpeg.deleteFile('input.mp4');
-				if (ret !== 0) throw new Error(`인코딩 실패 (코드: ${ret})`);
+			// 2단계: 세션이 하나면 그대로 출력; 여럿이면 concat demuxer로 타임스탬프 재정렬.
+			// concat demuxer는 각 파일의 타임스탬프를 이전 파일 끝 시점부터 이어 붙여
+			// 일시멈춤 구간의 타임스탬프 갭(→ 마지막 프레임 반복 현상)을 제거한다.
+			let outputFile: string;
+			if (sessionFiles.length === 1) {
+				outputFile = sessionFiles[0];
 			} else {
-				// concat demuxer의 -reset_timestamps 1로 세션 간 타임스탬프를 순차 재배치
-				// (세션별 별도 정규화 없이 concat 단일 패스로 처리)
-				const concatLines: string[] = [];
-				for (let i = 0; i < nonEmptySessions.length; i++) {
-					const file = `session_${i}.mp4`;
-					await writeSession(i, file);
-					concatLines.push(`file '${file}'`);
-				}
-				await ffmpeg.writeFile('concat.txt', new TextEncoder().encode(concatLines.join('\n')));
-				const ret = await ffmpeg.exec(['-f', 'concat', '-safe', '0', '-reset_timestamps', '1', '-i', 'concat.txt', '-c', 'copy', '-movflags', '+faststart', 'output.mp4']);
-				await ffmpeg.deleteFile('concat.txt');
-				for (let i = 0; i < nonEmptySessions.length; i++) await ffmpeg.deleteFile(`session_${i}.mp4`);
-				if (ret !== 0) throw new Error(`세션 병합 실패 (코드: ${ret})`);
+				const list = sessionFiles.map(f => `file '${f}'`).join('\n');
+				await ffmpeg!.writeFile('concat.txt', list);
+				const r = await ffmpeg!.exec([
+					'-f', 'concat', '-safe', '0', '-i', 'concat.txt',
+					'-c', 'copy', '-movflags', '+faststart', 'output.mp4'
+				]);
+				await ffmpeg!.deleteFile('concat.txt');
+				for (const f of sessionFiles) await ffmpeg!.deleteFile(f);
+				if (r !== 0) throw new Error(`세션 병합 실패 (코드: ${r})`);
+				outputFile = 'output.mp4';
 			}
 
-			const raw = (await ffmpeg.readFile('output.mp4')) as Uint8Array;
+			const raw = (await ffmpeg!.readFile(outputFile)) as Uint8Array;
+			await ffmpeg!.deleteFile(outputFile);
 			const buf = new ArrayBuffer(raw.byteLength);
 			new Uint8Array(buf).set(raw);
 			const blob = new Blob([buf], { type: 'video/mp4' });
 			const objUrl = URL.createObjectURL(blob);
-			await ffmpeg.deleteFile('output.mp4');
 
 			onSuccess?.({ filename: `${filename}.mp4`, url, blobUrl: objUrl });
 			reset();
@@ -189,6 +198,7 @@ export function useRecording(onSuccess?: OnSuccess) {
 		sessions = [[]];
 		segmentsSeen = new SvelteSet();
 		segCount = 0;
+		elapsedSec = 0;
 		isFirstPoll = true;
 		status = 'idle';
 		err = '';
@@ -197,6 +207,7 @@ export function useRecording(onSuccess?: OnSuccess) {
 	return {
 		get status() { return status; },
 		get segCount() { return segCount; },
+		get elapsedSec() { return elapsedSec; },
 		get err() { return err; },
 		get isActive() { return isActive; },
 		submit,

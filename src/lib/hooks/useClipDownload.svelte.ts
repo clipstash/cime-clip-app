@@ -38,6 +38,15 @@ export function useClipDownload(onSuccess: OnSuccess) {
 
 	// ── 헬퍼 함수 ───────────────────────────────────────────────────
 
+	function fmtTime(sec: number) {
+		const h = Math.floor(sec / 3600);
+		const m = Math.floor((sec % 3600) / 60);
+		const s = Math.floor(sec % 60);
+		const mm = String(m).padStart(2, '0');
+		const ss = String(s).padStart(2, '0');
+		return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+	}
+
 	// 선택 구간에 해당하는 세그먼트 인덱스 및 첫 세그먼트 시작 시간 반환
 	function filterSegments(
 		segments: string[],
@@ -115,13 +124,18 @@ export function useClipDownload(onSuccess: OnSuccess) {
 			// 6. 선택된 세그먼트 병렬 다운로드
 			if (cancelRequested) { dlStatus = 'idle'; progress = 0; progressLabel = ''; return; }
 			let completedFetches = 0;
+			let completedSec = 0;
+			const totalSelectedSec = selectedIdxs.reduce((acc, idx) => acc + (durations[idx] || 0), 0);
 			const segParts = await Promise.all(
 				selectedIdxs.map((segIdx) =>
 					fetchFile(proxyUrl(segments[segIdx])).then((data) => {
 						if (!cancelRequested) {
 							completedFetches++;
+							completedSec += durations[segIdx] ?? 0;
 							progress = Math.round((completedFetches / selectedIdxs.length) * PROGRESS_DOWNLOAD_END);
-							progressLabel = `${completedFetches} / ${selectedIdxs.length} 세그먼트`;
+							progressLabel = totalSelectedSec > 0
+								? `${fmtTime(completedSec)} / ${fmtTime(totalSelectedSec)}`
+								: `${completedFetches} / ${selectedIdxs.length} 세그먼트`;
 						}
 						return data;
 					})

@@ -14,6 +14,15 @@
   // ── 훅 초기화 ────────────────────────────────────────────────────
   const rec = useRecording((info) => onSuccess?.(info));
 
+  function fmtTime(sec: number) {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = Math.floor(sec % 60);
+    const mm = String(m).padStart(2, '0');
+    const ss = String(s).padStart(2, '0');
+    return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+  }
+
   // ── UI 상태 (RecordForm에 남는 것) ───────────────────────────────
   let recFileName = $state('');
   let titleLoading = $state(false);
@@ -51,7 +60,7 @@
   {:else if rec.isActive}
     <div class="rec-controls">
       <span class="rec-dot" class:paused={rec.status === 'paused'}></span>
-      <span class="rec-info">{rec.status === 'paused' ? '일시멈춤' : '녹화 중'} — {rec.segCount} 세그먼트</span>
+      <span class="rec-info">{rec.status === 'paused' ? '일시멈춤' : '녹화 중'} — {fmtTime(rec.elapsedSec)}</span>
       {#if rec.status === 'recording'}
         <button class="rec-btn rec-btn-pause" onclick={rec.pause}>일시멈춤</button>
       {:else}
@@ -61,7 +70,7 @@
       <button class="rec-btn rec-btn-cancel" onclick={rec.reset}>취소</button>
     </div>
   {:else if rec.status === 'encoding'}
-    <span class="rec-info">MP4 변환 중... ({rec.segCount} 세그먼트)</span>
+    <span class="rec-info">MP4 변환 중... ({fmtTime(rec.elapsedSec)})</span>
   {/if}
 </div>
 {#if rec.err}

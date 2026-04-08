@@ -56,8 +56,18 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 			if (!info || !info.m3u8_url) throw new Error('스트림 URL을 찾을 수 없습니다');
 
 			// 2. m3u8 파싱 → 세그먼트 목록 추출
-			const { initUrl, segments } = await parseM3u8(info.m3u8_url);
+			const { initUrl, segments, durations } = await parseM3u8(info.m3u8_url);
 			if (segments.length === 0) throw new Error('세그먼트를 찾을 수 없습니다');
+
+			const totalSec = durations.reduce((a, b) => a + b, 0);
+			const fmtTime = (sec: number) => {
+				const h = Math.floor(sec / 3600);
+				const m = Math.floor((sec % 3600) / 60);
+				const s = Math.floor(sec % 60);
+				const mm = String(m).padStart(2, '0');
+				const ss = String(s).padStart(2, '0');
+				return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+			};
 
 			// 3. 파일 저장 대화상자 — 사용자가 저장 위치 선택
 			//    fMP4(initUrl 있음) → .mp4 / MPEG-TS → .ts
@@ -120,7 +130,10 @@ export function useVideoDownload(onSuccess?: (info: { title: string | null; url:
 				await writable.write(buf);
 
 				progress = Math.round(((i + 1) / segments.length) * 100);
-				progressLabel = `${i + 1} / ${segments.length} 세그먼트`;
+				const elapsed = durations.slice(0, i + 1).reduce((a, b) => a + b, 0);
+				progressLabel = totalSec > 0
+					? `${fmtTime(elapsed)} / ${fmtTime(totalSec)}`
+					: `${i + 1} / ${segments.length} 세그먼트`;
 			}
 
 			// 6. 완료 처리
