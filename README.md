@@ -55,8 +55,9 @@ URL을 입력하면 소스 정보를 자동으로 감지합니다.
 
 | 기능 | 방식 |
 | --- | --- |
-| 클립 구간 절취 | **FFmpeg WASM** (`lib/ffmpeg/index.ts`) — 브라우저 내 인코딩 |
+| 클립 구간 절취 | **FFmpeg WASM** (`useClipDownload.svelte.ts`) — 브라우저 내 인코딩. 60분 초과 시 파트 분할 |
 | VOD 전체 다운로드 | **File System Access API** (`useVideoDownload.svelte.ts`) — 세그먼트를 병렬(동시 4개) 다운로드해 디스크에 직접 스트리밍 저장 (메모리 누적 없음) |
+| 실시간 녹화 | **m3u8 폴링** (`useRecording.svelte.ts`) — 3초마다 신규 세그먼트 다운로드. 일시정지 시 구간을 별도 세션으로 분리해 FFmpeg concat으로 병합 |
 
 > FFmpeg WASM 동작을 위해 COOP/COEP 헤더가 필요합니다. `vite.config.ts`에 설정되어 있습니다.
 
@@ -85,24 +86,25 @@ src/
 │   │   ├── videos.ts              # 영상 타입
 │   │   └── record.ts              # 녹화 타입
 │   ├── hooks/
-│   │   ├── useTimeRange.svelte.ts    # 시간 범위 선택 상태 및 로직
-│   │   └── useVideoDownload.svelte.ts # 전체 영상 다운로드 상태 및 로직
+│   │   ├── useTimeRange.svelte.ts     # 시간 범위 선택 상태 및 로직 (H:M:S + 슬라이더)
+│   │   ├── useVideoDownload.svelte.ts # VOD 전체 다운로드 상태 및 로직
+│   │   ├── useClipDownload.svelte.ts  # 클립 구간 절취 상태 및 로직 (FFmpeg)
+│   │   └── useRecording.svelte.ts     # 실시간 녹화 상태 및 로직 (m3u8 폴링)
 │   ├── stores/
 │   │   ├── sourceStore.svelte.ts     # URL 입력 및 소스 메타데이터 상태
 │   │   └── clipListStore.svelte.ts   # 클립·영상·녹화 목록 및 프리뷰 모달 상태
 │   ├── components/
 │   │   ├── Background.svelte         # 데코레이티브 배경
-│   │   ├── Nav.svelte                # 상단 네비게이션 (현재 비활성화)
 │   │   ├── SourcePreview.svelte      # 스트림 메타데이터 표시 (썸네일, 제목, 길이)
 │   │   ├── PreviewModal.svelte       # 영상 프리뷰 모달
 │   │   ├── forms/
-│   │   │   ├── ClipForm.svelte       # 클립 추출 폼 (시간 범위 + 다운로드 버튼)
+│   │   │   ├── ClipForm.svelte       # 클립 추출 + VOD 다운로드 폼
 │   │   │   └── RecordForm.svelte     # 실시간 녹화 폼
 │   │   ├── cards/
+│   │   │   ├── PreviewCard.svelte    # 생성 예정 클립 미리보기 카드
 │   │   │   ├── ClipCard.svelte       # 완료된 클립 카드
 │   │   │   ├── VideoCard.svelte      # 완료된 영상 다운로드 카드
-│   │   │   ├── RecordCard.svelte     # 완료된 녹화 카드
-│   │   │   └── PreviewCard.svelte    # 생성 예정 클립 미리보기 카드
+│   │   │   └── RecordCard.svelte     # 완료된 녹화 카드
 │   │   └── ui/
 │   │       ├── HmsInput.svelte       # 시:분:초 입력 필드
 │   │       ├── TimelineSlider.svelte # 드래그 가능한 타임라인 슬라이더
@@ -110,6 +112,7 @@ src/
 │   ├── ffmpeg/
 │   │   └── index.ts               # 브라우저 FFmpeg WASM 래퍼
 │   └── utils/
+│       ├── filename.ts            # makeBaseName() — 파일명 생성 유틸
 │       ├── proxy.ts               # proxyUrl() — CF Worker/폴백 프록시 URL 생성
 │       ├── status.ts              # statusColor(), statusLabel() 유틸
 │       ├── stream.ts              # HLS(m3u8) 플레이리스트 파싱
@@ -138,3 +141,11 @@ cloudflare-worker/
 2. 세그먼트를 동시 4개씩 병렬 다운로드
 3. **File System Access API**(`showSaveFilePicker`)로 파일을 디스크에 직접 스트리밍 저장 — 대용량 영상도 메모리 누적 없음
 4. 일시정지·재개·취소 가능
+
+### 실시간 녹화
+
+1. URL 입력 시 `/clips/info`로 라이브 스트림 여부 판별 → 라이브이면 RecordForm 표시
+2. 녹화 시작 시 3초 간격으로 m3u8 폴링 — 새 세그먼트만 내려받아 메모리에 누적
+3. 일시정지 시 폴링을 중단하고 현재까지의 세그먼트를 하나의 세션으로 확정
+4. 재개 시 새 세션을 시작 (일시정지 구간 세그먼트는 스킵)
+5. 완료 시 세션이 하나면 단순 remux, 여러 세션이면 FFmpeg concat demuxer로 병합해 단일 MP4 저장
