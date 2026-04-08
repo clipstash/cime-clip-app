@@ -13,6 +13,12 @@ import { dev } from '$app/environment';
 //     클라이언트가 CDN에서 직접 받아도 CORS 에러 없음 → Vercel 트래픽 절감
 //   - m3u8 플레이리스트·썸네일 등 나머지 → 서버에서 직접 중계
 
+function formatCause(cause: unknown): string {
+	if (cause instanceof Error) return ` (cause: ${cause.message})`;
+	if (cause) return ` (cause: ${String(cause)})`;
+	return '';
+}
+
 function isMediaSegment(targetUrl: string): boolean {
 	const pathname = targetUrl.split('?')[0].toLowerCase();
 	return pathname.endsWith('.ts') || pathname.endsWith('.m4s') ||
@@ -57,8 +63,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		});
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : String(e);
-		const cause = (e as { cause?: unknown })?.cause;
-		const causeMsg = cause instanceof Error ? ` (cause: ${cause.message})` : cause ? ` (cause: ${String(cause)})` : '';
+		const causeMsg = formatCause((e as { cause?: unknown })?.cause);
 		error(502, `Failed to fetch target URL: ${msg}${causeMsg}`);
 	}
 
