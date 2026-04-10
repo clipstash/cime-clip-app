@@ -67,7 +67,7 @@
   {#if record.status === 'completed' && record.file_url}
     <div class="clip-actions">
       <button class="preview-card-btn" onclick={() => onPreview(record.file_url!)}>미리보기</button>
-      <a class="download-btn" href={localUrl(record.file_url)} download>다운로드</a>
+      <a class="download-btn" href={localUrl(record.file_url)} download={record.filename}>다운로드</a>
     </div>
   {/if}
 </div>
