@@ -22,15 +22,25 @@ export async function parseM3u8(m3u8Url: string): Promise<M3u8Info> {
 	const text = await res.text();
 	const base = m3u8Url.substring(0, m3u8Url.lastIndexOf('/') + 1);
 
-	// 마스터 플레이리스트: #EXT-X-STREAM-INF 포함 → 첫 번째 서브 플레이리스트로 재귀
+	// 마스터 플레이리스트: #EXT-X-STREAM-INF 포함 → 최고 화질(BANDWIDTH 최대) 서브 플레이리스트로 재귀
 	if (text.includes('#EXT-X-STREAM-INF')) {
 		const lines = text.split('\n').map((l) => l.trim());
+		let bestUrl = '';
+		let bestBandwidth = -1;
+		let currentBandwidth = 0;
 		for (const line of lines) {
-			if (line && !line.startsWith('#')) {
-				const subUrl = line.startsWith('http') ? line : base + line;
-				return parseM3u8(subUrl);
+			if (line.startsWith('#EXT-X-STREAM-INF')) {
+				const bwMatch = line.match(/BANDWIDTH=(\d+)/);
+				currentBandwidth = bwMatch ? parseInt(bwMatch[1], 10) : 0;
+			} else if (line && !line.startsWith('#')) {
+				if (currentBandwidth > bestBandwidth) {
+					bestBandwidth = currentBandwidth;
+					bestUrl = line.startsWith('http') ? line : base + line;
+				}
+				currentBandwidth = 0;
 			}
 		}
+		if (bestUrl) return parseM3u8(bestUrl);
 		return { initUrl: null, segments: [], durations: [] };
 	}
 
