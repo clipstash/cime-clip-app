@@ -1,17 +1,16 @@
 import type { RequestHandler } from '@sveltejs/kit';
 
-const SITE_URL = 'https://clipdown.app';
-
 const pages = [
 	{ path: '/', changefreq: 'weekly', priority: '1.0' }
 ];
 
-export const GET: RequestHandler = () => {
+export const GET: RequestHandler = ({ url }) => {
+	const origin = url.origin;
 	const urls = pages
 		.map(
 			({ path, changefreq, priority }) => `
   <url>
-    <loc>${SITE_URL}${path}</loc>
+    <loc>${origin}${path}</loc>
     <changefreq>${changefreq}</changefreq>
     <priority>${priority}</priority>
   </url>`
