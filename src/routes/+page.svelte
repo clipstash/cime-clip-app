@@ -14,6 +14,12 @@
   import PreviewCard from '$lib/components/cards/PreviewCard.svelte';
 </script>
 
+<svelte:head>
+  <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"WebApplication","name":"CIME Clip","description":"씨미 라이브 스트림 클립·다운로드·녹화 웹앱","url":"https://cime-clip.app","applicationCategory":"MultimediaApplication","operatingSystem":"Web Browser","offers":{"@type":"Offer","price":"0","priceCurrency":"KRW"}}
+  </script>
+</svelte:head>
+
 <Background />
 <!-- <Nav /> -->
 
@@ -109,3 +115,28 @@
 {#if clipListStore.showModal}
   <PreviewModal url={clipListStore.modalUrl} onClose={() => clipListStore.closeModal()} />
 {/if}
+
+<section class="feature-section">
+  <div class="feature-grid">
+    <div class="feature-card">
+      <p class="feature-icon">✂️</p>
+      <h3>씨미 클립 추출</h3>
+      <p class="feature-desc">CIME VOD에서 원하는 구간을 지정해 MP4 클립으로 저장. 시작·종료 시간을 초 단위로 입력하거나 타임라인 슬라이더로 드래그해 구간을 선택할 수 있습니다.</p>
+      <ol class="manual-steps">
+        <li>씨미 VOD URL 입력</li>
+        <li>시작·종료 시간 지정</li>
+        <li>CLIP 버튼으로 다운로드</li>
+      </ol>
+    </div>
+    <div class="feature-card">
+      <p class="feature-icon">⏺️</p>
+      <h3>씨미 라이브 녹화</h3>
+      <p class="feature-desc">씨미 라이브 녹화는 방송 URL을 입력하면 자동 감지됩니다. 3초 간격으로 새 세그먼트를 받아 저장하며, 일시정지 후 재개해도 끊김 없이 하나의 파일로 병합합니다.</p>
+      <ol class="manual-steps">
+        <li>씨미 라이브 URL 입력</li>
+        <li>REC 버튼으로 녹화 시작</li>
+        <li>STOP으로 완료 — MP4 저장</li>
+      </ol>
+    </div>
+  </div>
+</section>
